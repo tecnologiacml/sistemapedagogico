@@ -1,79 +1,42 @@
-# Sistema Pedagógico Inteligente: guia da estrutura Django
+# Sistema Pedagógico Inteligente: arquitetura e guia da estrutura Django
 
-Este README explica, pasta por pasta e arquivo por arquivo, o que cada parte do projeto faz, com um exemplo de código em cada uma. Use como material de estudo e como documentação do repositório.
+Este documento explica a arquitetura do sistema e, pasta por pasta e arquivo por arquivo, o que cada parte do projeto faz, com exemplos de código. Use como documentação do repositório e como material de estudo.
+
+> **Sobre os exemplos de código:** os trechos são didáticos e servem para explicar o conceito. O código real do projeto está nos próprios arquivos (por exemplo, os campos exatos do model `Aluno` podem diferir do exemplo). Em caso de dúvida, vale o que está no repositório.
 
 ## Sumário
 
-1. [Como rodar o projeto](#1-como-rodar-o-projeto)
-2. [Visão geral da estrutura](#2-visão-geral-da-estrutura)
-3. [Arquivos da raiz](#3-arquivos-da-raiz)
-4. [A pasta `config/`](#4-a-pasta-config)
-5. [A pasta `apps/` e os arquivos de um app](#5-a-pasta-apps-e-os-arquivos-de-um-app)
-6. [Os três apps do sistema](#6-os-três-apps-do-sistema)
-7. [As pastas `templates/` e `static/`](#7-as-pastas-templates-e-static)
-8. [O caminho de um pedido (MVT)](#8-o-caminho-de-um-pedido-mvt)
-9. [Comandos essenciais](#9-comandos-essenciais)
-10. [Erros comuns](#10-erros-comuns)
-11. [Roteiro de estudo](#11-roteiro-de-estudo)
+1. [Arquitetura em resumo](#1-arquitetura-em-resumo)
+2. [Como rodar o projeto](#2-como-rodar-o-projeto)
+3. [Visão geral da estrutura](#3-visão-geral-da-estrutura)
+4. [Arquivos da raiz](#4-arquivos-da-raiz)
+5. [A pasta `config/`](#5-a-pasta-config)
+6. [A pasta `apps/` e os arquivos de um app](#6-a-pasta-apps-e-os-arquivos-de-um-app)
+7. [Os três apps do sistema](#7-os-três-apps-do-sistema)
+8. [As pastas `templates/` e `static/`](#8-as-pastas-templates-e-static)
+9. [O caminho de um pedido (MVT)](#9-o-caminho-de-um-pedido-mvt)
+10. [Comandos essenciais](#10-comandos-essenciais)
+11. [Erros comuns](#11-erros-comuns)
+12. [Roteiro de estudo](#12-roteiro-de-estudo)
 
 ---
 
-## 1. Como rodar o projeto
+## 1. Arquitetura em resumo
 
-```bash
-# 1. Criar e ativar o ambiente virtual
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+**Estilo:** monolito modular com Django, no padrão MVT (Model-View-Template).
 
-# 2. Instalar as dependências
-pip install -r requirements.txt
+- **Monolito:** uma única aplicação Django, publicada em conjunto. Para o tamanho do projeto e do time (2 pessoas), evita a complexidade de operar vários serviços.
+- **Modular:** o código é dividido em apps por domínio (`usuarios`, `alunos`, `importacao`). Cada app tem seus próprios models, views, templates e testes, e conhece pouco dos outros.
+- **MVT:** o Model define os dados e conversa com o banco pelo ORM; a View recebe o pedido, aplica as regras e decide a resposta; o Template gera o HTML que o navegador mostra.
 
-# 3. Criar o arquivo .env na raiz (veja a seção 3)
+**Banco de dados:** PostgreSQL hospedado no **Supabase**, acessado **diretamente pelo Django** (driver `psycopg`), sem API intermediária. O Supabase é usado como banco, não como backend da aplicação. Os dados de conexão vêm de variáveis de ambiente (arquivo `.env`), e o mesmo banco é usado no desenvolvimento e na produção do projeto, por isso cada pessoa do time precisa do seu `.env` com as credenciais.
 
-# 4. Criar as tabelas no banco
-python manage.py migrate
+**Por que não outra arquitetura:**
 
-# 5. Criar o usuário administrador
-python manage.py createsuperuser
+- Microsserviços: complexidade desnecessária para o tamanho do sistema.
+- SPA com API separada: dobraria o trabalho (API e front) para o time atual.
 
-# 6. Ligar o servidor
-python manage.py runserver
-```
-
-Abra `http://127.0.0.1:8000/admin/` no navegador.
-
----
-
-## 2. Visão geral da estrutura
-
-```
-projeto/
-├── manage.py
-├── .env
-├── .gitignore
-├── requirements.txt
-├── db.sqlite3
-├── config/                  ← o PROJETO (configurações gerais)
-│   ├── __init__.py
-│   ├── settings.py
-│   ├── urls.py
-│   ├── wsgi.py
-│   └── asgi.py
-├── apps/                    ← os MÓDULOS do sistema
-│   ├── __init__.py
-│   ├── usuarios/
-│   ├── alunos/
-│   └── importacao/
-├── templates/               ← páginas HTML compartilhadas
-└── static/                  ← CSS, JavaScript, imagens
-```
-
-A ideia central: o **projeto** (`config/`) cuida do que é geral, e cada **app** (dentro de `apps/`) é um módulo do sistema com seus dados, regras e telas. Isso é o "monolito modular" da arquitetura: um único sistema, dividido em módulos separados.
-
-### 2.1. Diagrama de arquitetura
-
-Estilo: monolito modular com Django (MVT). O banco é o PostgreSQL do Supabase,
-acessado diretamente pelo Django (driver psycopg), sem API intermediária.
+### 1.1. Diagrama de arquitetura
 
 ```mermaid
 flowchart LR
@@ -96,9 +59,90 @@ flowchart LR
     T -- "HTML" --> U
     M -- "SQL (psycopg)" --> DB
 ```
+
+### 1.2. Fluxo principal
+
+1. O usuário abre uma página no navegador, que envia uma requisição HTTP.
+2. O Django usa o `urls.py` para achar a view correspondente.
+3. A view verifica o login e a permissão do usuário.
+4. A view pede os dados aos models, que consultam o PostgreSQL no Supabase.
+5. A view entrega os dados ao template, que gera o HTML.
+6. O navegador recebe e exibe a página.
+
 ---
 
-## 3. Arquivos da raiz
+## 2. Como rodar o projeto
+
+Os comandos abaixo são para **PowerShell (Windows)**. No Linux ou macOS, troque a ativação do ambiente virtual por `source venv/bin/activate`.
+
+```powershell
+# 1. Entrar na pasta do projeto (a que contém o manage.py)
+cd sistema-pedagogico
+
+# 2. Criar e ativar o ambiente virtual (use apenas UM: venv)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# 3. Instalar as dependências
+pip install -r requirements.txt
+
+# 4. Criar o arquivo .env na mesma pasta do manage.py (veja a seção 4)
+
+# 5. Conferir a configuração e a conexão com o banco
+python manage.py check
+python manage.py showmigrations
+
+# 6. Criar as tabelas no banco
+python manage.py migrate
+
+# 7. Criar o usuário administrador
+python manage.py createsuperuser
+
+# 8. Ligar o servidor
+python manage.py runserver
+```
+
+Abra `http://127.0.0.1:8000/admin/` no navegador.
+
+**Se o PowerShell bloquear a ativação do ambiente:**
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+**Atenção ao ambiente virtual:** use somente um (`venv`). Se o VS Code ativar outro (por exemplo `.venv`) que está vazio, aparece `ModuleNotFoundError: No module named 'django'`. Em `Ctrl+Shift+P`, escolha **Python: Select Interpreter** e selecione `.\venv\Scripts\python.exe`.
+
+---
+
+## 3. Visão geral da estrutura
+
+```
+Repo-SistemaPedagógico/
+└── sistema-pedagogico/
+    ├── manage.py
+    ├── .env                     ← segredos locais (NÃO vai para o Git)
+    ├── .gitignore
+    ├── requirements.txt
+    ├── config/                  ← o PROJETO (configurações gerais)
+    │   ├── __init__.py
+    │   ├── settings.py
+    │   ├── urls.py
+    │   ├── wsgi.py
+    │   └── asgi.py
+    ├── apps/                    ← os MÓDULOS do sistema
+    │   ├── __init__.py
+    │   ├── usuarios/
+    │   ├── alunos/
+    │   └── importacao/
+    ├── templates/               ← páginas HTML compartilhadas
+    └── static/                  ← CSS, JavaScript, imagens
+```
+
+A ideia central: o **projeto** (`config/`) cuida do que é geral, e cada **app** (dentro de `apps/`) é um módulo do sistema com seus dados, regras e telas. Isso é o "monolito modular": um único sistema, dividido em módulos separados.
+
+---
+
+## 4. Arquivos da raiz
 
 ### `manage.py`
 
@@ -123,18 +167,35 @@ if __name__ == '__main__':
 
 ### `.env`
 
-**O que é:** um arquivo de texto com segredos e configurações que mudam de um ambiente para outro (seu computador, homologação, produção).
+**O que é:** um arquivo de texto com segredos e configurações que mudam de um ambiente para outro.
 
-**Para que serve:** manter senhas e chaves **fora do código**. O `settings.py` lê estes valores com `os.environ`. Este arquivo **nunca** vai para o GitHub.
+**Para que serve:** manter senhas e chaves **fora do código**. O `settings.py` lê estes valores com `os.environ`. Este arquivo **nunca** vai para o GitHub e **nunca** deve ser enviado por zip, e-mail ou chat.
+
+O projeto precisa das variáveis do banco. Sem elas, o Django para com `KeyError: 'DB_NAME'`.
 
 ```
 SECRET_KEY=troque-por-uma-chave-longa-e-aleatoria
 DEBUG=True
+
+DB_NAME=postgres
+DB_USER=postgres.xxxxxxxxxxxxxxxxxxxx
+DB_PASSWORD=senha-do-banco
+DB_HOST=aws-0-regiao.pooler.supabase.com
+DB_PORT=5432
 ```
 
-Para gerar uma chave:
+**Onde pegar os valores do banco:** no painel do Supabase, botão **Connect** (topo da tela), método **Session pooler**.
 
-```bash
+- `DB_HOST`: host do pooler (`...pooler.supabase.com`).
+- `DB_USER`: no pooler tem o formato `postgres.<ref-do-projeto>`, e não só `postgres`.
+- `DB_PORT`: use `5432` (Session pooler). A porta `6543` (Transaction pooler) pode dar problema com as migrações do Django.
+- `DB_PASSWORD`: é a senha definida na criação do projeto. Se não lembrar, redefina em **Database > Settings > Reset database password**.
+
+> **Por que Session pooler e não "Direct connection":** o host `db.<projeto>.supabase.co` (conexão direta) usa apenas IPv6. Em redes sem IPv6 o erro é `failed to resolve host`. O pooler funciona em IPv4.
+
+Para gerar uma `SECRET_KEY`:
+
+```powershell
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
@@ -150,6 +211,18 @@ SECRET_KEY = os.environ['SECRET_KEY']
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ```
 
+**Sugestão para o time:** mantenha um arquivo `.env.example` no repositório, apenas com os **nomes** das variáveis e valores de mentira. Assim, quem clonar o projeto sabe o que precisa preencher.
+
+```
+SECRET_KEY=
+DEBUG=True
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+DB_HOST=
+DB_PORT=5432
+```
+
 ### `.gitignore`
 
 **O que é:** a lista do que o Git deve ignorar.
@@ -158,50 +231,40 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ```
 .env
-db.sqlite3
 venv/
+.venv/
 __pycache__/
 *.pyc
 staticfiles/
+
+# Dados pessoais: nunca versionar
+*.xlsx
+*.csv
 ```
+
+> Planilhas (`*.xlsx`, `*.csv`) com dados de alunos e responsáveis contêm dados pessoais, inclusive de crianças. Mantenha-as **fora** da pasta do projeto.
 
 ### `requirements.txt`
 
-**O que é:** a lista das bibliotecas que o projeto usa.
+**O que é:** a lista das bibliotecas que o projeto usa, com as versões.
 
-**Para que serve:** instalar tudo de uma vez em outro computador ou no servidor com `pip install -r requirements.txt`. Para gerar a lista a partir do seu ambiente: `pip freeze > requirements.txt` (isso também grava as versões).
+**Para que serve:** instalar tudo de uma vez em outro computador com `pip install -r requirements.txt`. Para gerar a lista a partir do seu ambiente: `pip freeze > requirements.txt`.
 
-```
-Django
-python-dotenv
-pandas
-openpyxl
-gunicorn
-whitenoise
-```
+As bibliotecas principais do projeto são:
 
-Cada uma tem um papel: `Django` é o framework, `python-dotenv` lê o `.env`, `pandas` e `openpyxl` leem o Excel, `gunicorn` e `whitenoise` entram na hora de publicar.
+| Biblioteca | Papel |
+|---|---|
+| `Django` | O framework |
+| `psycopg` e `psycopg-binary` | Driver de conexão com o PostgreSQL (Supabase) |
+| `python-dotenv` | Lê o arquivo `.env` |
+| `pandas`, `numpy` e `openpyxl` | Leitura e tratamento de planilhas Excel na importação |
+| `asgiref`, `sqlparse`, `tzdata`, `python-dateutil`, `six`, `et_xmlfile` | Dependências das anteriores |
 
-### `db.sqlite3`
-
-**O que é:** o banco de dados de desenvolvimento, em um único arquivo.
-
-**Para que serve:** guardar os dados enquanto você desenvolve, sem instalar nada. Em produção ele será trocado pelo PostgreSQL. **Não vai para o GitHub**, porque pode conter dados reais.
-
-Para olhar dentro dele:
-
-```bash
-python manage.py dbshell
-```
-
-```sql
-.tables
-SELECT * FROM alunos_aluno;
-```
+Para publicar o sistema (produção) ainda serão necessários o `gunicorn` (servidor) e o `whitenoise` (arquivos estáticos). Eles **não estão** no `requirements.txt` atual.
 
 ---
 
-## 4. A pasta `config/`
+## 5. A pasta `config/`
 
 É o **projeto** em si. Aqui ficam as configurações gerais e o mapa de endereços.
 
@@ -234,18 +297,9 @@ INSTALLED_APPS = [
 ]
 ```
 
-**Banco de dados** (em desenvolvimento, SQLite; depois, PostgreSQL com dados vindos do `.env`):
+**Banco de dados** (PostgreSQL do Supabase, com os dados vindos do `.env`):
 
 ```python
-# Desenvolvimento
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-# Produção (PostgreSQL), lendo do .env
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -257,6 +311,8 @@ DATABASES = {
     }
 }
 ```
+
+Se uma dessas variáveis faltar no `.env`, o Django para com `KeyError`.
 
 **Templates** (onde ficam as páginas HTML compartilhadas):
 
@@ -327,7 +383,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 application = get_wsgi_application()
 ```
 
-Comando de produção que usa este arquivo:
+Comando de produção que usa este arquivo (exige instalar o `gunicorn`):
 
 ```bash
 gunicorn config.wsgi
@@ -349,7 +405,7 @@ application = get_asgi_application()
 
 ---
 
-## 5. A pasta `apps/` e os arquivos de um app
+## 6. A pasta `apps/` e os arquivos de um app
 
 ### `apps/__init__.py`
 
@@ -357,8 +413,8 @@ application = get_asgi_application()
 
 ### Como criar um app dentro de `apps/`
 
-```bash
-mkdir apps/alunos
+```powershell
+mkdir apps\alunos
 python manage.py startapp alunos apps/alunos
 ```
 
@@ -430,7 +486,7 @@ Aluno.objects.create(nome='Ana', matricula='2024001', data_nascimento='2005-03-1
 
 **Para que serve:** cada arquivo registra uma mudança nas tabelas. É assim que o banco acompanha o seu `models.py`. Você **não escreve** esses arquivos; você manda o Django gerá-los e aplicá-los:
 
-```bash
+```powershell
 python manage.py makemigrations    # lê o models.py e gera o arquivo de migração
 python manage.py migrate           # aplica no banco
 ```
@@ -453,13 +509,15 @@ class Migration(migrations.Migration):
     ]
 ```
 
-Os arquivos de migração **vão para o Git**, porque o servidor precisa deles para montar as tabelas.
+Os arquivos de migração **vão para o Git**, porque o servidor e os outros colegas precisam deles para montar as mesmas tabelas.
+
+> **Como o banco é compartilhado (Supabase), combine no time quem roda o `migrate`.** Duas pessoas migrando ao mesmo tempo, ou migrações geradas em paralelo na mesma tabela, causam conflito.
 
 ### `admin.py`: o painel pronto
 
 **O que é:** onde você registra os modelos no painel de administração do Django.
 
-**Para que serve:** ganhar telas de listagem, busca, cadastro e edição **sem escrever HTML**. É o grande atalho da primeira entrega.
+**Para que serve:** ganhar telas de listagem, busca, cadastro e edição **sem escrever HTML**.
 
 ```python
 from django.contrib import admin
@@ -627,9 +685,11 @@ class AlunoTests(TestCase):
 
 Para rodar: `python manage.py test`.
 
+> **Cuidado com o banco nos testes:** como o banco configurado é o do Supabase, o `manage.py test` tenta criar um banco de teste nele. Para evitar isso, configure o `settings.py` para usar SQLite em memória quando estiver rodando testes (por exemplo, detectando `'test'` em `sys.argv`).
+
 ---
 
-## 6. Os três apps do sistema
+## 7. Os três apps do sistema
 
 ### App `usuarios`: login e perfis
 
@@ -701,11 +761,13 @@ Template do login, em `templates/registration/login.html` (o Django procura exat
 
 ### App `alunos`: cadastro e consulta
 
-**Responsabilidade:** cadastrar, editar, listar e buscar alunos. Todos os exemplos das seções 5 (models, views, urls, forms, templates, admin e testes) são deste app.
+**Responsabilidade:** cadastrar, editar, listar e buscar alunos. Os exemplos da seção 6 (models, views, urls, forms, templates, admin e testes) são deste app.
 
 ### App `importacao`: Excel para o banco
 
 **Responsabilidade:** receber a planilha, validar e gravar, guardando o histórico. A regra é **nunca gravar direto na tabela final**: ler, validar, mostrar os erros e só então confirmar.
+
+> **Dados pessoais:** as planilhas têm nome, endereço, celular e nascimento de crianças e adultos. Não as coloque no Git, não as deixe na pasta do projeto e apague as cópias que não forem mais necessárias.
 
 `apps/importacao/models.py`: o histórico de cada importação:
 
@@ -724,7 +786,7 @@ class Importacao(models.Model):
         return f'{self.arquivo} em {self.criado_em:%d/%m/%Y %H:%M}'
 ```
 
-`apps/importacao/services.py`: a lógica de ler e validar fica num arquivo à parte (é uma convenção sua, não do Django), para a view ficar curta e a regra poder ser testada:
+`apps/importacao/services.py`: a lógica de ler e validar fica num arquivo à parte (é uma convenção do projeto, não do Django), para a view ficar curta e a regra poder ser testada:
 
 ```python
 import pandas as pd
@@ -806,7 +868,7 @@ Template do upload (`importacao/enviar.html`). Note o `enctype`, sem ele o arqui
 
 ---
 
-## 7. As pastas `templates/` e `static/`
+## 8. As pastas `templates/` e `static/`
 
 ### `templates/` (da raiz)
 
@@ -878,7 +940,7 @@ Para usar em um template, lembre do `{% load static %}` no topo:
 
 ---
 
-## 8. O caminho de um pedido (MVT)
+## 9. O caminho de um pedido (MVT)
 
 Quando alguém abre `/alunos/` no navegador:
 
@@ -892,14 +954,14 @@ apps/alunos/urls.py     3. "/" aponta para views.lista_alunos
    ▼
 apps/alunos/views.py    4. confere o login e pede os dados ao model
    ▼
-apps/alunos/models.py   5. busca os alunos no banco
+apps/alunos/models.py   5. busca os alunos no PostgreSQL (Supabase)
    ▼
 templates/alunos/lista.html   6. monta o HTML com os dados
    ▼
 Navegador               7. recebe a página pronta
 ```
 
-Resumo: **URL → View → Model → banco → Template → resposta.**
+Resumo: **URL → View → Model → banco (Supabase) → Template → resposta.**
 
 | Django (MVT) | Equivale a (MVC) |
 |---|---|
@@ -909,7 +971,7 @@ Resumo: **URL → View → Model → banco → Template → resposta.**
 
 ---
 
-## 9. Comandos essenciais
+## 10. Comandos essenciais
 
 | Comando | O que faz |
 |---|---|
@@ -917,33 +979,41 @@ Resumo: **URL → View → Model → banco → Template → resposta.**
 | `python manage.py startapp nome apps/nome` | Cria um app novo (a pasta precisa existir) |
 | `python manage.py makemigrations` | Gera migrações a partir do `models.py` |
 | `python manage.py migrate` | Aplica as migrações no banco |
+| `python manage.py showmigrations` | Lista as migrações e testa a conexão com o banco |
 | `python manage.py createsuperuser` | Cria o administrador |
 | `python manage.py shell` | Console Python com o Django carregado, bom para testar consultas |
+| `python manage.py dbshell` | Abre o console SQL do banco (exige o `psql` instalado) |
 | `python manage.py test` | Roda os testes |
-| `python manage.py check` | Procura erros de configuração |
+| `python manage.py check` | Procura erros de configuração (não testa o banco) |
 | `python manage.py collectstatic` | Junta os arquivos estáticos para produção |
 
 Rotina ao mudar um modelo: editar o `models.py`, depois `makemigrations`, depois `migrate`.
 
 ---
 
-## 10. Erros comuns
+## 11. Erros comuns
 
 | Sintoma | Causa provável |
 |---|---|
+| `ModuleNotFoundError: No module named 'django'` | O ambiente virtual errado está ativo (por exemplo `.venv` vazio). Ative o `venv` e rode `pip install -r requirements.txt` |
+| `KeyError: 'DB_NAME'` (ou outra variável `DB_*`) | O `.env` não existe, está vazio, está fora da pasta do `manage.py` ou falta a variável |
+| `KeyError: 'SECRET_KEY'` | Falta `SECRET_KEY` no `.env` |
+| `failed to resolve host 'db....supabase.co'` | Conexão direta do Supabase usa só IPv6. Troque o `DB_HOST` para o **Session pooler** |
+| `password authentication failed` | Senha ou usuário errados. No pooler o usuário é `postgres.<ref-do-projeto>` |
+| `Tenant or user not found` | Usuário sem o `.<ref-do-projeto>`, ou região do host errada |
 | `NameError: load_dotenv is not defined` | Faltou `from dotenv import load_dotenv` ou `pip install python-dotenv` |
-| `KeyError: 'SECRET_KEY'` | O `.env` não existe, está vazio ou está fora da raiz |
 | App não aparece / erro de import | Falta o app em `INSTALLED_APPS`, ou o `name` no `apps.py` não é `apps.alunos` |
-| `no such table` | Faltou rodar `makemigrations` e `migrate` |
+| `relation ... does not exist` / `no such table` | Faltou `makemigrations` e `migrate` |
 | `TemplateDoesNotExist` | Template na pasta errada; o caminho correto é `templates/alunos/lista.html` dentro do app |
 | `NoReverseMatch` | O nome usado em `{% url %}` não existe no `urls.py` |
 | CSRF verification failed | Faltou `{% csrf_token %}` no formulário |
 | Arquivo enviado não chega na view | Faltou `enctype="multipart/form-data"` no formulário |
 | CSS não carrega | Falta `{% load static %}` no template, ou `STATICFILES_DIRS` no settings |
+| PowerShell não deixa ativar o venv | Rode `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
 
 ---
 
-## 11. Roteiro de estudo
+## 12. Roteiro de estudo
 
 1. Rodar o projeto e entrar em `/admin/` com o superusuário.
 2. No app `alunos`, criar o model `Aluno`, rodar `makemigrations` e `migrate`.
@@ -956,6 +1026,6 @@ Rotina ao mudar um modelo: editar o `models.py`, depois `makemigrations`, depois
 9. Criar o `Perfil` e o decorador de permissão no app `usuarios`.
 10. Criar o `Importacao` e o `services.py` de leitura do Excel no app `importacao`.
 11. Escrever os primeiros testes em `tests.py`, começando pela importação.
-12. Trocar o SQLite pelo PostgreSQL usando variáveis do `.env`.
+12. Preparar a publicação: `gunicorn`, `whitenoise`, `DEBUG=False` e backups do Supabase.
 
 Para aprofundar, o tutorial oficial do Django (o projeto de enquetes, em `docs.djangoproject.com`) cobre o mesmo caminho. Faça os dois em paralelo: o tutorial para entender, e este sistema para praticar.
