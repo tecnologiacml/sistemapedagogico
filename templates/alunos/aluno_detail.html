@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titulo %}{{ object.nome }} · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="card shadow-sm"><div class="card-body">
+  <h1 class="h4">{{ object.nome }}</h1>
+  <dl class="row mb-0">
+    <dt class="col-sm-3">CPF</dt><dd class="col-sm-9">{{ object.cpf_formatado }}</dd>
+    <dt class="col-sm-3">Data de nascimento</dt><dd class="col-sm-9">{{ object.data_nascimento|date:"d/m/Y" }}</dd>
+    <dt class="col-sm-3">Cadastrado em</dt><dd class="col-sm-9">{{ object.criado_em|date:"d/m/Y H:i" }}</dd>
+  </dl>
+</div></div>
+<div class="mt-3">
+  <a class="btn btn-secondary" href="{% url 'alunos:lista' %}">Voltar</a>
+  {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:editar' object.pk %}">Editar</a>{% endif %}
+  {% if user.pode_excluir_alunos %}<a class="btn btn-outline-danger" href="{% url 'alunos:excluir' object.pk %}">Excluir</a>{% endif %}
+</div>
+{% endblock %}

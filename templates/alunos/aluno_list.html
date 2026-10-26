@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titulo %}Alunos · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Alunos</h1>
+  {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:criar' %}">Novo aluno</a>{% endif %}
+</div>
+<form method="get" class="input-group mb-3">
+  <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por nome ou CPF">
+  <button class="btn btn-outline-secondary">Buscar</button>
+</form>
+<div class="table-responsive">
+<table class="table table-striped bg-white align-middle">
+  <thead><tr><th>Nome</th><th>CPF</th><th>Nascimento</th><th></th></tr></thead>
+  <tbody>
+  {% for aluno in object_list %}
+    <tr>
+      <td><a href="{% url 'alunos:detalhe' aluno.pk %}">{{ aluno.nome }}</a></td>
+      <td>{{ aluno.cpf_formatado }}</td>
+      <td>{{ aluno.data_nascimento|date:"d/m/Y" }}</td>
+      <td class="text-end">
+        {% if user.pode_editar_alunos %}<a class="btn btn-sm btn-outline-primary" href="{% url 'alunos:editar' aluno.pk %}">Editar</a>{% endif %}
+        {% if user.pode_excluir_alunos %}<a class="btn btn-sm btn-outline-danger" href="{% url 'alunos:excluir' aluno.pk %}">Excluir</a>{% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" class="text-center text-muted">Nenhum aluno encontrado.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if is_paginated %}
+<nav><ul class="pagination">
+  {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>{% endif %}
+  <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span></li>
+  {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Próxima</a></li>{% endif %}
+</ul></nav>
+{% endif %}
+{% endblock %}

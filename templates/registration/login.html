@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Entrar · Sistema Pedagógico{% endblock %}
+{% block layout %}
+<div class="ml-login">
+  <div class="lado-marca">
+    <div>
+      <img src="{% static 'img/logo-branco.png' %}" alt="Colégio Monteiro Lobato">
+      <p>Juntos por uma educação ainda mais completa.</p>
+    </div>
+  </div>
+  <div class="lado-form">
+    <div class="caixa">
+      <h1 class="h3 mb-1">Bem-vindo(a)</h1>
+      <p class="text-muted mb-4">Acesse o sistema pedagógico.</p>
+      <form method="post">
+        {% csrf_token %}
+        {% if form.errors %}<div class="alert alert-danger">Usuário ou senha incorretos.</div>{% endif %}
+        <div class="mb-3">
+          <label class="form-label" for="id_username">Usuário</label>
+          <input class="form-control form-control-lg" type="text" name="username" id="id_username" autofocus required>
+        </div>
+        <div class="mb-4">
+          <label class="form-label" for="id_password">Senha</label>
+          <input class="form-control form-control-lg" type="password" name="password" id="id_password" required>
+        </div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="btn btn-primary btn-lg w-100">Entrar</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

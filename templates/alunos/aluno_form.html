@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}{% if object %}Editar aluno{% else %}Novo aluno{% endif %} · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<h1 class="h3 mb-3">{% if object %}Editar aluno{% else %}Novo aluno{% endif %}</h1>
+<form method="post" class="card card-body shadow-sm">
+  {% csrf_token %}
+  {% for field in form %}
+    <div class="mb-3">
+      <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+      {% for erro in field.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+    </div>
+  {% endfor %}
+  {% for erro in form.non_field_errors %}<div class="alert alert-danger">{{ erro }}</div>{% endfor %}
+  <div>
+    <button class="btn btn-primary">Salvar</button>
+    <a class="btn btn-secondary" href="{% url 'alunos:lista' %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

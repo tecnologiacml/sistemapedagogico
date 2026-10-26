@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Início · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<section class="ml-hero mb-4">
+  <div class="texto">
+    <div class="eyebrow">Bem-vindo(a) ao sistema pedagógico</div>
+    <h1>Colégio Monteiro Lobato</h1>
+    <p>Aqui você acompanha o desenvolvimento dos nossos alunos e tudo o que faz parte da jornada educacional.</p>
+  </div>
+  <div class="foto" role="img" aria-label="Fachada do Colégio Monteiro Lobato"></div>
+</section>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="ml-card"><a href="{% url 'alunos:lista' %}">
+      <div class="icone">{% include "_icones.html" with nome="alunos" %}</div>
+      <div class="numero">{{ total_alunos }}</div>
+      <div class="rotulo">Alunos ativos {% include "_icones.html" with nome="seta" %}</div>
+    </a></div>
+  </div>
+  <div class="col-md-4">
+    <div class="ml-card secundario">
+      <div class="icone">{% include "_icones.html" with nome="turmas" %}</div>
+      <div class="numero">—</div>
+      <div class="rotulo">Turmas <small>(em breve)</small></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="ml-card secundario">
+      <div class="icone">{% include "_icones.html" with nome="grafico" %}</div>
+      <div class="numero">—</div>
+      <div class="rotulo">Desempenho médio <small>(em breve)</small></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="ml-painel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Alunos por turma</h2>
+      </div>
+      <p class="text-muted mb-0">O gráfico de ocupação aparecerá aqui quando o módulo de Turmas for criado.</p>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="ml-painel ml-citacao">
+      <img src="{% static 'img/marca-branca.png' %}" alt="" style="filter: invert(14%) sepia(80%) saturate(2800%) hue-rotate(340deg);">
+      <div>“Mais do que ensinar, acreditamos no potencial de cada aluno.”</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
