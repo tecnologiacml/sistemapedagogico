@@ -70,6 +70,32 @@ projeto/
 
 A ideia central: o **projeto** (`config/`) cuida do que é geral, e cada **app** (dentro de `apps/`) é um módulo do sistema com seus dados, regras e telas. Isso é o "monolito modular" da arquitetura: um único sistema, dividido em módulos separados.
 
+### 2.1. Diagrama de arquitetura
+
+Estilo: monolito modular com Django (MVT). O banco é o PostgreSQL do Supabase,
+acessado diretamente pelo Django (driver psycopg), sem API intermediária.
+
+```mermaid
+flowchart LR
+    U["Navegador<br/>(secretaria, coordenação, professor)"]
+
+    subgraph D["Aplicação Django (monolito modular)"]
+        direction TB
+        URLS["config/urls.py"]
+        V["Views"]
+        T["Templates"]
+        M["Models / ORM"]
+        URLS --> V
+        V --> T
+        V --> M
+    end
+
+    DB[("Supabase<br/>PostgreSQL")]
+
+    U -- "HTTP" --> URLS
+    T -- "HTML" --> U
+    M -- "SQL (psycopg)" --> DB
+```
 ---
 
 ## 3. Arquivos da raiz
