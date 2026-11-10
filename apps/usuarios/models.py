@@ -8,10 +8,11 @@ class Usuario(AbstractUser):
     class Perfil(models.TextChoices):
         ADMINISTRADOR = "administrador", "Administrador"
         COORDENACAO = "coordenacao", "Coordenação"
-        PROFESSOR = "professor", "Professor"
+        GESTOR = "gestor", "Gestor"
+        ORIENTADOR = "orientador", "Orientador"
 
     perfil = models.CharField(
-        max_length=20, choices=Perfil.choices, default=Perfil.PROFESSOR
+        max_length=20, choices=Perfil.choices, default=Perfil.ORIENTADOR
     )
 
     class Meta:
@@ -23,12 +24,3 @@ class Usuario(AbstractUser):
         if self.is_superuser:
             self.perfil = self.Perfil.ADMINISTRADOR
         super().save(*args, **kwargs)
-
-    # Regras de permissão usadas nas views e nos templates.
-    @property
-    def pode_editar_alunos(self):
-        return self.perfil in (self.Perfil.ADMINISTRADOR, self.Perfil.COORDENACAO)
-
-    @property
-    def pode_excluir_alunos(self):
-        return self.perfil == self.Perfil.ADMINISTRADOR
