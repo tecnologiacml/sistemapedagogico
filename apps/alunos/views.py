@@ -1,44 +1,53 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
-
-from apps.usuarios.mixins import PerfilRequiredMixin
+from django.views.generic import (
+    CreateView, DeleteView, DetailView, ListView, UpdateView,
+)
 
 from .forms import AlunoForm
 from .models import Aluno
-from .validators import somente_digitos
 
 
-class AlunoListView(PerfilRequiredMixin, ListView):
+class PodeEditarMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.pode_editar_alunos
+
+
+class PodeExcluirMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.pode_excluir_alunos
+
+
+class AlunoListView(LoginRequiredMixin, ListView):
     model = Aluno
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            filtro = Q(nome__icontains=q)
-            digitos = somente_digitos(q)
-            if digitos:
-                filtro |= Q(cpf__contains=digitos)
-            qs = qs.filter(filtro)
+        qs = Aluno.objects.select_related("responsavel").order_by("nome")
+        self.q = self.request.GET.get("q", "").strip()
+        if self.q:
+            qs = qs.filter(
+                Q(nome__icontains=self.q)
+                | Q(ra__icontains=self.q)
+            )
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["q"] = self.request.GET.get("q", "").strip()
+        ctx["q"] = self.q
         return ctx
+    
 
 
-class AlunoDetailView(PerfilRequiredMixin, DetailView):
+class AlunoDetailView(LoginRequiredMixin, DetailView):
     model = Aluno
 
 
-class AlunoCreateView(PerfilRequiredMixin, CreateView):
+class AlunoCreateView(PodeEditarMixin, CreateView):
     model = Aluno
     form_class = AlunoForm
-    permissao = "pode_editar_alunos"
     success_url = reverse_lazy("alunos:lista")
 
     def form_valid(self, form):
@@ -46,10 +55,9 @@ class AlunoCreateView(PerfilRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class AlunoUpdateView(PerfilRequiredMixin, UpdateView):
+class AlunoUpdateView(PodeEditarMixin, UpdateView):
     model = Aluno
     form_class = AlunoForm
-    permissao = "pode_editar_alunos"
     success_url = reverse_lazy("alunos:lista")
 
     def form_valid(self, form):
@@ -57,9 +65,8 @@ class AlunoUpdateView(PerfilRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class AlunoDeleteView(PerfilRequiredMixin, DeleteView):
+class AlunoDeleteView(PodeExcluirMixin, DeleteView):
     model = Aluno
-    permissao = "pode_excluir_alunos"
     success_url = reverse_lazy("alunos:lista")
 
     def form_valid(self, form):

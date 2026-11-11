@@ -5,30 +5,40 @@
   <h1 class="h3 mb-0">Alunos</h1>
   {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:criar' %}">Novo aluno</a>{% endif %}
 </div>
+
 <form method="get" class="input-group mb-3">
-  <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por nome ou CPF">
+  <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por aluno ou RA">
   <button class="btn btn-outline-secondary">Buscar</button>
 </form>
+
 <div class="table-responsive">
 <table class="table table-striped bg-white align-middle">
-  <thead><tr><th>Nome</th><th>CPF</th><th>Nascimento</th><th></th></tr></thead>
+  <thead>
+    <tr><th>RA</th><th>Aluno</th><th style="width:110px"></th></tr>
+  </thead>
   <tbody>
   {% for aluno in object_list %}
     <tr>
-      <td><a href="{% url 'alunos:detalhe' aluno.pk %}">{{ aluno.nome }}</a></td>
-      <td>{{ aluno.cpf_formatado }}</td>
-      <td>{{ aluno.data_nascimento|date:"d/m/Y" }}</td>
-      <td class="text-end">
-        {% if user.pode_editar_alunos %}<a class="btn btn-sm btn-outline-primary" href="{% url 'alunos:editar' aluno.pk %}">Editar</a>{% endif %}
-        {% if user.pode_excluir_alunos %}<a class="btn btn-sm btn-outline-danger" href="{% url 'alunos:excluir' aluno.pk %}">Excluir</a>{% endif %}
+      <td>{{ aluno.ra|default:"—" }}</td>
+      <td>{{ aluno.nome }}</td>
+      <td class="text-end text-nowrap">
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'alunos:detalhe' aluno.pk %}" title="Ver detalhes" aria-label="Ver detalhes de {{ aluno.nome }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </a>
+        {% if user.pode_editar_alunos %}
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'alunos:editar' aluno.pk %}" title="Editar" aria-label="Editar {{ aluno.nome }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </a>
+        {% endif %}
       </td>
     </tr>
   {% empty %}
-    <tr><td colspan="4" class="text-center text-muted">Nenhum aluno encontrado.</td></tr>
+    <tr><td colspan="3" class="text-center text-muted">Nenhum aluno encontrado.</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+
 {% if is_paginated %}
 <nav><ul class="pagination">
   {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>{% endif %}
