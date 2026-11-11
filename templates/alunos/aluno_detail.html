@@ -1,17 +1,66 @@
 {% extends "base.html" %}
 {% block titulo %}{{ object.nome }} · Sistema Pedagógico{% endblock %}
 {% block conteudo %}
-<div class="card shadow-sm"><div class="card-body">
-  <h1 class="h4">{{ object.nome }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ object.nome }}</h1>
+  <div>
+    {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:editar' object.pk %}">Editar</a>{% endif %}
+    {% if user.pode_excluir_alunos %}<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalExcluir">Excluir</button>{% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3"><div class="card-body">
+  <h2 class="h5 mb-3">Dados do aluno</h2>
   <dl class="row mb-0">
-    <dt class="col-sm-3">CPF</dt><dd class="col-sm-9">{{ object.cpf_formatado }}</dd>
-    <dt class="col-sm-3">Data de nascimento</dt><dd class="col-sm-9">{{ object.data_nascimento|date:"d/m/Y" }}</dd>
-    <dt class="col-sm-3">Cadastrado em</dt><dd class="col-sm-9">{{ object.criado_em|date:"d/m/Y H:i" }}</dd>
+    <dt class="col-sm-3">Celular</dt><dd class="col-sm-9">{{ object.celular_formatado|default:"—" }}</dd>
+    <dt class="col-sm-3">RA</dt><dd class="col-sm-9">{{ object.ra|default:"—" }}</dd>
+    <dt class="col-sm-3">Série</dt><dd class="col-sm-9">{{ object.serie|default:"—" }}</dd>
+    <dt class="col-sm-3">Unidade</dt><dd class="col-sm-9">{{ object.unidade }}</dd>
+    <dt class="col-sm-3">Nascimento</dt><dd class="col-sm-9">{{ object.data_nascimento|date:"d/m/Y" }} ({{ object.idade }} anos)</dd>
+    <dt class="col-sm-3">Celular</dt><dd class="col-sm-9">{{ object.celular|default:"—" }}</dd>
+    <dt class="col-sm-3">E-mail</dt><dd class="col-sm-9">{{ object.email|default:"—" }}</dd>
+    <dt class="col-sm-3">Endereço</dt>
+    <dd class="col-sm-9">
+      {{ object.endereco|default:"—" }}{% if object.bairro %}, {{ object.bairro }}{% endif %}{% if object.cidade %} · {{ object.cidade }}{% endif %}{% if object.cep %} · CEP {{ object.cep }}{% endif %}
+    </dd>
   </dl>
 </div></div>
+
+<div class="card shadow-sm"><div class="card-body">
+  <h2 class="h5 mb-3">Responsável</h2>
+  {% if object.responsavel %}
+  <dl class="row mb-0">
+    <dt class="col-sm-3">Nome</dt><dd class="col-sm-9">{{ object.responsavel.nome }}</dd>
+    <dt class="col-sm-3">Celular</dt><dd class="col-sm-9">{{ object.responsavel.celular|default:"—" }}</dd>
+    <dt class="col-sm-3">E-mail</dt><dd class="col-sm-9">{{ object.responsavel.email|default:"—" }}</dd>
+  </dl>
+  {% else %}
+  <p class="text-muted mb-0">Nenhum responsável vinculado.</p>
+  {% endif %}
+</div></div>
+
 <div class="mt-3">
   <a class="btn btn-secondary" href="{% url 'alunos:lista' %}">Voltar</a>
-  {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:editar' object.pk %}">Editar</a>{% endif %}
-  {% if user.pode_excluir_alunos %}<a class="btn btn-outline-danger" href="{% url 'alunos:excluir' object.pk %}">Excluir</a>{% endif %}
 </div>
+
+{% if user.pode_excluir_alunos %}
+<div class="modal fade" id="modalExcluir" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" action="{% url 'alunos:excluir' object.pk %}" class="modal-content">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h2 class="modal-title h5">Excluir aluno</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        Tem certeza que deseja excluir <strong>{{ object.nome }}</strong>? Esta ação não pode ser desfeita.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-danger">Sim, excluir</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
