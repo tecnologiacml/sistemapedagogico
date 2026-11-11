@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}{% if object %}Editar usuário{% else %}Novo usuário{% endif %} · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<h1 class="h3 mb-3">{% if object %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <form method="post" class="card card-body" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% for campo in form %}
+        <div class="mb-3{% if campo.field.widget.input_type == 'checkbox' %} form-check{% endif %}">
+          {% if campo.field.widget.input_type == 'checkbox' %}
+            {{ campo }}<label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {% else %}
+            <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            {{ campo }}
+          {% endif %}
+          {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+          {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary">Salvar</button>
+        <a class="btn btn-outline-secondary" href="{% url 'usuarios:lista' %}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+  <div class="col-lg-5">
+    <div class="card card-body">
+      <h2 class="h6">O que cada perfil pode fazer</h2>
+      <ul class="small mb-0 ps-3">
+        <li><strong>Administrador:</strong> visualiza e edita tudo e cadastra usuários.</li>
+        <li><strong>Orientador:</strong> visualiza e edita alunos (e, depois, encontros).</li>
+        <li><strong>Coordenação:</strong> somente visualiza.</li>
+        <li><strong>Gestor pedagógico:</strong> somente visualiza.</li>
+      </ul>
+      <p class="small text-muted mt-3 mb-0">Para tirar o acesso de alguém, desmarque "Pode entrar no sistema". Usuários não são apagados, para manter o histórico.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

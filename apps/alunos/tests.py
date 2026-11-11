@@ -27,9 +27,9 @@ class AlunoViewsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         P = Usuario.Perfil
-        cls.admin = Usuario.objects.create_user("adm", password="x", perfil=P.ADMINISTRADOR)
-        cls.coord = Usuario.objects.create_user("coord", password="x", perfil=P.COORDENACAO)
-        cls.prof = Usuario.objects.create_user("prof", password="x", perfil=P.PROFESSOR)
+        cls.admin = Usuario.objects.create_user("adm", email="a@t.local", password="x", perfil=P.ADMINISTRADOR)
+        cls.coord = Usuario.objects.create_user("orient", email="o@t.local", password="x", perfil=P.ORIENTADOR)
+        cls.prof = Usuario.objects.create_user("gestor", email="g@t.local", password="x", perfil=P.GESTOR)
         cls.aluno = Aluno.objects.create(
             nome="Maria Silva", cpf=CPF_OK, data_nascimento=date(2010, 5, 1)
         )
@@ -43,7 +43,7 @@ class AlunoViewsTests(TestCase):
         r = self.client.get(reverse("alunos:lista"))
         self.assertRedirects(r, f"{reverse('login')}?next={reverse('alunos:lista')}")
 
-    def test_professor_so_consulta(self):
+    def test_gestor_so_consulta(self):
         self.client.force_login(self.prof)
         self.assertEqual(self.client.get(reverse("alunos:lista")).status_code, 200)
         self.assertEqual(self.client.get(reverse("alunos:detalhe", args=[self.aluno.pk])).status_code, 200)
@@ -53,7 +53,7 @@ class AlunoViewsTests(TestCase):
         self.assertEqual(self.client.post(reverse("alunos:excluir", args=[self.aluno.pk])).status_code, 403)
         self.assertTrue(Aluno.objects.filter(pk=self.aluno.pk).exists())
 
-    def test_coordenacao_cria_e_edita_mas_nao_exclui(self):
+    def test_orientador_cria_e_edita_mas_nao_exclui(self):
         self.client.force_login(self.coord)
         r = self.client.post(reverse("alunos:criar"), self.dados())
         self.assertRedirects(r, reverse("alunos:lista"))
@@ -96,3 +96,10 @@ class AlunoViewsTests(TestCase):
             {"nome": "Maria S.", "cpf": CPF_OK, "data_nascimento": "2010-05-01"},
         )
         self.assertRedirects(r, reverse("alunos:lista"))
+
+    def test_coordenacao_so_consulta(self):
+        c = Usuario.objects.create_user("coordenacao", email="c@t.local", password="x", perfil=Usuario.Perfil.COORDENACAO)
+        self.client.force_login(c)
+        self.assertEqual(self.client.get(reverse("alunos:lista")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("alunos:criar")).status_code, 403)
+        self.assertEqual(self.client.post(reverse("alunos:criar"), self.dados()).status_code, 403)

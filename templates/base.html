@@ -13,25 +13,27 @@
 </head>
 <body>
 {% block layout %}
-  <aside class="ml-sidebar">
+  <aside class="ml-sidebar" id="menu-lateral" aria-label="Menu principal">
     <a href="{% url 'home' %}"><img class="logo" src="{% static 'img/logo-branco.png' %}" alt="Colégio Monteiro Lobato"></a>
     <ul class="ml-nav">
-      <li><a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}ativo{% endif %}">{% include "_icones.html" with nome="home" %}Início</a></li>
-      <li><a href="{% url 'alunos:lista' %}" class="{% if request.resolver_match.namespace == 'alunos' %}ativo{% endif %}">{% include "_icones.html" with nome="alunos" %}Alunos</a></li>
-      {# Turmas, Relatórios e Configurações: ativar quando os módulos existirem #}
-      <li><a href="#" class="disabled" title="Em breve">{% include "_icones.html" with nome="turmas" %}Turmas</a></li>
-      <li><a href="#" class="disabled" title="Em breve">{% include "_icones.html" with nome="relatorios" %}Relatórios</a></li>
-      <li><a href="{% url 'admin:index' %}">{% include "_icones.html" with nome="config" %}Configurações</a></li>
+      <li><a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}ativo{% endif %}"{% if request.resolver_match.url_name == 'home' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="home" %}Início</a></li>
+      <li><a href="{% url 'alunos:lista' %}" class="{% if request.resolver_match.namespace == 'alunos' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'alunos' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="alunos" %}Alunos</a></li>
+      {# Turmas, Dashboards e Relatórios: ativar quando os módulos existirem #}
+      <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="turmas" %}Turmas</a></li>
+      <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="grafico" %}Dashboards</a></li>
+      <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="relatorios" %}Relatórios</a></li>
+      {% if user.pode_gerenciar_usuarios %}
+      <li><a href="{% url 'usuarios:lista' %}" class="{% if request.resolver_match.namespace == 'usuarios' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'usuarios' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="config" %}Usuários</a></li>
+      {% endif %}
     </ul>
-    <div class="ml-lema">Educação<br>que constrói<br>o amanhã.</div>
   </aside>
+  <div class="ml-overlay" hidden></div>
 
   <div class="ml-principal">
     <header class="ml-topbar">
-      <form class="ml-busca" method="get" action="{% url 'alunos:lista' %}">
-        {% include "_icones.html" with nome="busca" %}
-        <input class="form-control" type="search" name="q" placeholder="Buscar por aluno, turma ou nome..." value="{{ q|default:'' }}">
-      </form>
+      <button class="ml-menu-btn" type="button" aria-label="Abrir menu" aria-controls="menu-lateral" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
       <div class="ml-usuario">
         <span class="d-none d-md-inline small">Olá, {{ user.get_full_name|default:user.username }}
           <span class="text-muted">· {{ user.get_perfil_display }}</span></span>
@@ -41,13 +43,14 @@
         </form>
       </div>
     </header>
-    <main class="ml-conteudo">
+    <main class="ml-conteudo {% block main_classe %}{% endblock %}">
       {% for message in messages %}
         <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
       {% endfor %}
       {% block conteudo %}{% endblock %}
     </main>
   </div>
+  <script src="{% static 'js/menu.js' %}"></script>
 {% endblock %}
 </body>
 </html>
