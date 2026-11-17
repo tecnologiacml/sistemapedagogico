@@ -18,7 +18,7 @@ class AlunoListView(PerfilRequiredMixin, ListView):
         qs = super().get_queryset()
         q = self.request.GET.get("q", "").strip()
         if q:
-            filtro = Q(nome__icontains=q)
+            filtro = Q(nome__icontains=q) | Q(ra__icontains=q)
             digitos = somente_digitos(q)
             if digitos:
                 filtro |= Q(cpf__contains=digitos)

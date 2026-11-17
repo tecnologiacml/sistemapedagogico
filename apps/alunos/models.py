@@ -4,7 +4,9 @@ from .validators import validar_cpf
 
 
 class Aluno(models.Model):
+    ra = models.CharField("RA", max_length=20, unique=True, null=True, blank=True)
     nome = models.CharField(max_length=150)
+    serie = models.CharField("Série", max_length=30, blank=True)
     cpf = models.CharField(
         "CPF", max_length=11, unique=True, validators=[validar_cpf],
         help_text="Somente números.",

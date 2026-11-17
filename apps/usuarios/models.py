@@ -37,6 +37,11 @@ class Usuario(AbstractUser):
         return self.perfil in (self.Perfil.ADMINISTRADOR, self.Perfil.ORIENTADOR)
 
     @property
+    def pode_editar_encontros(self):
+        """Quem cadastra encontros: administrador e orientador."""
+        return self.perfil in (self.Perfil.ADMINISTRADOR, self.Perfil.ORIENTADOR)
+
+    @property
     def pode_excluir_alunos(self):
         return self.perfil == self.Perfil.ADMINISTRADOR
 

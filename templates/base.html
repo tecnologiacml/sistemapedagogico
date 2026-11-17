@@ -18,6 +18,7 @@
     <ul class="ml-nav">
       <li><a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}ativo{% endif %}"{% if request.resolver_match.url_name == 'home' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="home" %}Início</a></li>
       <li><a href="{% url 'alunos:lista' %}" class="{% if request.resolver_match.namespace == 'alunos' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'alunos' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="alunos" %}Alunos</a></li>
+      <li><a href="{% url 'encontros:lista' %}" class="{% if request.resolver_match.namespace == 'encontros' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'encontros' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="encontros" %}Encontros</a></li>
       {# Turmas, Dashboards e Relatórios: ativar quando os módulos existirem #}
       <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="turmas" %}Turmas</a></li>
       <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="grafico" %}Dashboards</a></li>

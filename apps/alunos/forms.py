@@ -11,7 +11,7 @@ class AlunoForm(forms.ModelForm):
 
     class Meta:
         model = Aluno
-        fields = ["nome", "cpf", "data_nascimento"]
+        fields = ["ra", "nome", "serie", "cpf", "data_nascimento"]
         widgets = {
             "data_nascimento": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
         }

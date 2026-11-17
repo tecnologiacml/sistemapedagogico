@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     # Apps do projeto
     'apps.usuarios',
     'apps.alunos',
+    'apps.encontros',
     'apps.importacao',
 ]
 

@@ -5,5 +5,5 @@ from .models import Aluno
 
 @admin.register(Aluno)
 class AlunoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "cpf", "data_nascimento")
-    search_fields = ("nome", "cpf")
+    list_display = ("ra", "nome", "serie", "cpf")
+    search_fields = ("nome", "cpf", "ra")
