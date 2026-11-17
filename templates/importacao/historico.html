@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}Histórico de importações · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Histórico de importações</h1>
+  <div>
+    <a class="btn btn-primary" href="{% url 'importacao:importar' %}">Nova importação</a>
+    <a class="btn btn-secondary" href="{% url 'alunos:lista' %}">Voltar</a>
+  </div>
+</div>
+
+<div class="table-responsive">
+<table class="table table-striped bg-white align-middle">
+  <thead>
+    <tr>
+      <th>Data</th><th>Arquivo</th><th>Usuário</th><th>Situação</th>
+      <th class="text-end">Cadastrados</th><th class="text-end">Atualizados</th><th class="text-end">Rejeitados</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for i in importacoes %}
+    <tr>
+      <td class="text-nowrap">{{ i.criado_em|date:"d/m/Y H:i" }}</td>
+      <td>{{ i.arquivo_nome }}</td>
+      <td>{{ i.usuario }}</td>
+      <td>{{ i.get_status_display }}</td>
+      {% if i.status == "concluida" %}
+        <td class="text-end">{{ i.qtd_criados }}</td>
+        <td class="text-end">{{ i.qtd_atualizados }}</td>
+        <td class="text-end">{{ i.qtd_rejeitados }}</td>
+      {% else %}
+        <td class="text-end">—</td><td class="text-end">—</td><td class="text-end">—</td>
+      {% endif %}
+      <td class="text-end text-nowrap">
+        {% if i.status == "previa" %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'importacao:previa' i.pk %}">Continuar</a>
+        {% elif i.status == "concluida" %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'importacao:resultado' i.pk %}">Detalhes</a>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8" class="text-center text-muted">Nenhuma importação feita ainda.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

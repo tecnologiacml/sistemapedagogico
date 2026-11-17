@@ -1,0 +1,626 @@
+
+{% extends "base.html" %}
+
+{% block titulo %}Prévia da importação · Sistema Pedagógico{% endblock %}
+
+{% block conteudo %}
+
+<style>
+    .acoes-importacao {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+    }
+
+    .btn-acao {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 7px;
+        font-weight: bold;
+    }
+
+    dialog.modal-edicao {
+        width: min(850px, 95%);
+        max-height: 90vh;
+        overflow-y: auto;
+        border: none;
+        border-radius: 12px;
+        padding: 0;
+        box-shadow: 0 10px 40px rgba(0,0,0,.2);
+    }
+
+    dialog.modal-edicao::backdrop {
+        background: rgba(0,0,0,.5);
+    }
+
+    .modal-conteudo {
+        padding: 24px;
+    }
+
+    .secao-edicao {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 16px;
+        margin-bottom: 18px;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Prévia da importação</h1>
+        <span class="text-muted small">
+            {{ imp.arquivo_nome }} · Unidade {{ imp.unidade }}
+        </span>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <strong>Confira os dados antes de importar.</strong>
+    Nada foi gravado no cadastro de alunos ainda.
+    Você pode editar ou remover registros nesta etapa.
+</div>
+
+<!-- RESUMO -->
+<div class="row g-3 mb-4">
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Serão cadastrados</div>
+                <div class="h3 text-success mb-0">{{ a_criar }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Serão atualizados</div>
+                <div class="h3 text-primary mb-0">{{ a_atualizar }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Não serão importados</div>
+                <div class="h3 text-danger mb-0">{{ imp.total_erros }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Removidos da prévia</div>
+                <div class="h3 mb-0">{{ excluidas }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-4 col-xl">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Linhas no arquivo</div>
+                <div class="h3 mb-0">{{ imp.total_linhas }}</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% if imp.colunas_ignoradas %}
+<div class="alert alert-secondary">
+    <strong>Colunas não reconhecidas:</strong>
+    {{ imp.colunas_ignoradas }}
+</div>
+{% endif %}
+
+<!-- REJEITADAS -->
+{% if rejeitadas %}
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+
+        <h2 class="h5 mb-3">Não serão importados e o motivo</h2>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Linha</th>
+                        <th>Aluno</th>
+                        <th>R.A.</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for l in rejeitadas %}
+                    <tr>
+                        <td>{{ l.numero_linha }}</td>
+                        <td>{{ l.nome|default:"—" }}</td>
+                        <td>{{ l.ra|default:"—" }}</td>
+                        <td class="text-danger">{{ l.motivo }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+<!-- AVISOS -->
+{% if com_aviso %}
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+
+        <h2 class="h5 mb-3">Serão importados com avisos</h2>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Linha</th>
+                        <th>Aluno</th>
+                        <th>Aviso</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for l in com_aviso %}
+                    <tr>
+                        <td>{{ l.numero_linha }}</td>
+                        <td>{{ l.nome }}</td>
+                        <td class="text-warning-emphasis">{{ l.aviso }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+<!-- ALUNOS VÁLIDOS -->
+{% if amostra %}
+<div class="card shadow-sm mb-3">
+
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h5 mb-1">Alunos que serão gravados</h2>
+                <span class="text-muted small">
+                    {{ imp.total_validas }} registro(s) válido(s).
+                    Confira e edite antes de confirmar.
+                </span>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-striped table-hover table-sm align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Linha</th>
+                        <th>Ação</th>
+                        <th>Aluno</th>
+                        <th>R.A.</th>
+                        <th>Série</th>
+                        <th>Idade</th>
+                        <th>Responsável financeiro</th>
+                        <th>Idade do responsável</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for l in amostra %}
+
+                    <tr>
+
+                        <td>{{ l.numero }}</td>
+
+                        <td>
+                            {% if l.acao == "atualizar" %}
+                            <span class="badge text-bg-primary">Atualizar</span>
+                            {% else %}
+                            <span class="badge text-bg-success">Cadastrar</span>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ l.dados.nome }}</td>
+
+                        <td>{{ l.dados.ra|default:"—" }}</td>
+
+                        <td>{{ l.dados.serie|default:"—" }}</td>
+
+                        <td>{{ l.dados.idade }}</td>
+
+                        <td>{{ l.dados.resp_nome|default:"—" }}</td>
+
+                        <td>{{ l.dados.idade_responsavel }}</td>
+
+                        <td>
+                            <div class="acoes-importacao">
+
+                                <!-- EDITAR -->
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm btn-acao"
+                                    title="Editar aluno"
+                                    onclick="abrirEdicao('modal-{{ l.id }}')">
+                                    ✎
+                                </button>
+
+                                <!-- EXCLUIR -->
+                                <form
+                                    method="post"
+                                    action="{% url 'importacao:previa' imp.pk %}"
+                                    onsubmit="return confirm('Tem certeza de que deseja remover {{ l.dados.nome|escapejs }} desta importação?');">
+
+                                    {% csrf_token %}
+
+                                    <input type="hidden" name="acao" value="excluir">
+                                    <input type="hidden" name="linha_id" value="{{ l.id }}">
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-outline-danger btn-sm btn-acao"
+                                        title="Remover aluno">
+                                        ×
+                                    </button>
+
+                                </form>
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+    </div>
+</div>
+
+<!-- MODAIS DE EDIÇÃO -->
+{% for l in amostra %}
+
+<dialog class="modal-edicao" id="modal-{{ l.id }}">
+
+    <div class="modal-conteudo">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <div>
+                <h2 class="h5 mb-1">Editar aluno</h2>
+                <small class="text-muted">
+                    Linha {{ l.numero }} do arquivo
+                </small>
+            </div>
+
+            <button
+                type="button"
+                class="btn-close"
+                onclick="fecharEdicao('modal-{{ l.id }}')">
+            </button>
+
+        </div>
+
+        <form
+            method="post"
+            action="{% url 'importacao:previa' imp.pk %}"
+            onsubmit="return confirm('Deseja realmente salvar as alterações deste aluno na prévia?');">
+
+            {% csrf_token %}
+
+            <input type="hidden" name="acao" value="editar">
+            <input type="hidden" name="linha_id" value="{{ l.id }}">
+
+            <!-- DADOS DO ALUNO -->
+            <div class="secao-edicao">
+
+                <h3 class="h6 mb-3">Dados do aluno</h3>
+
+                <div class="row g-3">
+
+                    <div class="col-md-8">
+                        <label class="form-label">Nome completo *</label>
+                        <input
+                            type="text"
+                            name="nome"
+                            class="form-control"
+                            maxlength="255"
+                            value="{{ l.dados.nome }}"
+                            required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">R.A.</label>
+                        <input
+                            type="text"
+                            name="ra"
+                            class="form-control"
+                            value="{{ l.dados.ra }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Data de nascimento *</label>
+                        <input
+                            type="date"
+                            name="data_nascimento"
+                            class="form-control"
+                            value="{{ l.dados.data_nascimento }}"
+                            required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Idade calculada</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            value="{{ l.dados.idade }}"
+                            disabled>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Matrícula</label>
+                        <input
+                            type="text"
+                            name="matricula"
+                            class="form-control"
+                            value="{{ l.dados.matricula }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Série</label>
+                        <input
+                            type="text"
+                            name="serie"
+                            class="form-control"
+                            value="{{ l.dados.serie }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Celular</label>
+                        <input
+                            type="text"
+                            name="celular"
+                            class="form-control"
+                            value="{{ l.dados.celular }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">E-mail</label>
+                        <input
+                            type="email"
+                            name="email"
+                            class="form-control"
+                            value="{{ l.dados.email }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">CEP</label>
+                        <input
+                            type="text"
+                            name="cep"
+                            class="form-control"
+                            value="{{ l.dados.cep }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Endereço</label>
+                        <input
+                            type="text"
+                            name="endereco"
+                            class="form-control"
+                            value="{{ l.dados.endereco }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Bairro</label>
+                        <input
+                            type="text"
+                            name="bairro"
+                            class="form-control"
+                            value="{{ l.dados.bairro }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Cidade</label>
+                        <input
+                            type="text"
+                            name="cidade"
+                            class="form-control"
+                            value="{{ l.dados.cidade }}">
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- DADOS DO RESPONSÁVEL -->
+            <div class="secao-edicao">
+
+                <h3 class="h6 mb-3">Responsável financeiro</h3>
+
+                <div class="row g-3">
+
+                    <div class="col-md-8">
+                        <label class="form-label">Nome do responsável</label>
+                        <input
+                            type="text"
+                            name="resp_nome"
+                            class="form-control"
+                            value="{{ l.dados.resp_nome }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Data de nascimento</label>
+                        <input
+                            type="date"
+                            name="resp_data_nascimento"
+                            class="form-control"
+                            value="{{ l.dados.resp_data_nascimento }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Idade calculada</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            value="{{ l.dados.idade_responsavel }}"
+                            disabled>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Celular</label>
+                        <input
+                            type="text"
+                            name="resp_celular"
+                            class="form-control"
+                            value="{{ l.dados.resp_celular }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">E-mail</label>
+                        <input
+                            type="email"
+                            name="resp_email"
+                            class="form-control"
+                            value="{{ l.dados.resp_email }}">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">CEP</label>
+                        <input
+                            type="text"
+                            name="resp_cep"
+                            class="form-control"
+                            value="{{ l.dados.resp_cep }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Endereço</label>
+                        <input
+                            type="text"
+                            name="resp_endereco"
+                            class="form-control"
+                            value="{{ l.dados.resp_endereco }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Bairro</label>
+                        <input
+                            type="text"
+                            name="resp_bairro"
+                            class="form-control"
+                            value="{{ l.dados.resp_bairro }}">
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="fecharEdicao('modal-{{ l.id }}')">
+                    Cancelar
+                </button>
+
+                <button type="submit" class="btn btn-primary">
+                    Salvar alterações
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</dialog>
+
+{% endfor %}
+
+{% else %}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body text-center py-4">
+        <p class="text-muted mb-0">
+            Não existem alunos válidos para importar.
+        </p>
+    </div>
+</div>
+
+{% endif %}
+
+<!-- AÇÕES FINAIS -->
+<form
+    method="post"
+    action="{% url 'importacao:previa' imp.pk %}"
+    class="d-flex flex-wrap gap-2 mt-4">
+
+    {% csrf_token %}
+
+    <button
+        type="submit"
+        name="acao"
+        value="confirmar"
+        class="btn btn-success"
+        {% if imp.total_validas == 0 %}disabled{% endif %}
+        onclick="return confirm('Deseja realmente confirmar a importação dos {{ imp.total_validas }} aluno(s) válido(s)?');">
+
+        Confirmar importação
+
+    </button>
+
+    <button
+        type="submit"
+        name="acao"
+        value="cancelar"
+        class="btn btn-outline-secondary"
+        onclick="return confirm('Tem certeza de que deseja cancelar toda a importação?');">
+
+        Cancelar importação
+
+    </button>
+
+</form>
+
+<script>
+    function abrirEdicao(id) {
+        if (!confirm("Deseja editar os dados deste aluno?")) {
+            return;
+        }
+
+        const modal = document.getElementById(id);
+
+        if (modal) {
+            modal.showModal();
+        }
+    }
+
+    function fecharEdicao(id) {
+        const modal = document.getElementById(id);
+
+        if (modal) {
+            modal.close();
+        }
+    }
+</script>
+
+{% endblock %}

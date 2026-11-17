@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block titulo %}Alunos · Sistema Pedagógico{% endblock %}
 {% block conteudo %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-start mb-3">
   <h1 class="h3 mb-0">Alunos</h1>
-  {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:criar' %}">Novo aluno</a>{% endif %}
+  <div class="d-flex flex-column align-items-end gap-2">
+    {% if user.pode_editar_alunos %}<a class="btn btn-primary" href="{% url 'alunos:criar' %}">Novo aluno</a>{% endif %}
+    {% if perms.importacao.importar_alunos %}<a class="btn btn-outline-primary btn-sm" href="{% url 'importacao:importar' %}">Importar alunos (via CSV)</a>{% endif %}
+  </div>
 </div>
 
 <form method="get" class="input-group mb-3">

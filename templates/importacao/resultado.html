@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block titulo %}Resultado da importação · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Resultado da importação</h1>
+  <span class="text-muted">{{ imp.arquivo_nome }} · {{ imp.get_status_display }}</span>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body">
+    <div class="text-muted small">Cadastrados</div><div class="h3 mb-0 text-success">{{ imp.qtd_criados }}</div>
+  </div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body">
+    <div class="text-muted small">Atualizados</div><div class="h3 mb-0 text-primary">{{ imp.qtd_atualizados }}</div>
+  </div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body">
+    <div class="text-muted small">Não importados</div><div class="h3 mb-0 text-danger">{{ imp.qtd_rejeitados }}</div>
+  </div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body">
+    <div class="text-muted small">Linhas no arquivo</div><div class="h3 mb-0">{{ imp.total_linhas }}</div>
+  </div></div></div>
+</div>
+
+{% if imp.colunas_ignoradas %}
+<div class="alert alert-secondary">
+  <strong>Colunas não reconhecidas (ignoradas):</strong> {{ imp.colunas_ignoradas }}
+</div>
+{% endif %}
+
+{% if rejeitadas %}
+<div class="card shadow-sm mb-3"><div class="card-body">
+  <h2 class="h5 mb-3">Não importados e o motivo</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Linha</th><th>Aluno</th><th>R.A.</th><th>Motivo</th></tr></thead>
+      <tbody>
+        {% for l in rejeitadas %}
+        <tr>
+          <td>{{ l.numero_linha }}</td>
+          <td>{{ l.nome|default:"—" }}</td>
+          <td>{{ l.ra|default:"—" }}</td>
+          <td class="text-danger">{{ l.motivo }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm mt-3" href="{% url 'importacao:erros_csv' imp.pk %}">Baixar rejeitadas (CSV)</a>
+</div></div>
+{% endif %}
+
+{% if com_aviso %}
+<div class="card shadow-sm mb-3"><div class="card-body">
+  <h2 class="h5 mb-3">Importados com avisos</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Linha</th><th>Aluno</th><th>Aviso</th></tr></thead>
+      <tbody>
+        {% for l in com_aviso %}
+        <tr><td>{{ l.numero_linha }}</td><td>{{ l.nome }}</td><td class="text-warning-emphasis">{{ l.aviso }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div></div>
+{% endif %}
+
+<div class="d-flex gap-2">
+  <a class="btn btn-primary" href="{% url 'alunos:lista' %}">Ver alunos</a>
+  <a class="btn btn-outline-secondary" href="{% url 'importacao:importar' %}">Nova importação</a>
+  <a class="btn btn-outline-secondary" href="{% url 'importacao:historico' %}">Histórico</a>
+</div>
+{% endblock %}

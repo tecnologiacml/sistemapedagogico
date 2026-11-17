@@ -41,14 +41,14 @@ class Aluno(models.Model):
     serie = models.CharField(max_length=50, null=True, blank=True)
 
     cpf = models.CharField(
-    "CPF",
-    max_length=11,
-    unique=True,
-    validators=[validar_cpf],
-    help_text="Somente números.",
-    null=True,
-    blank=True
-)
+        "CPF",
+        max_length=11,
+        unique=True,
+        null=True,
+        blank=True,
+        validators=[validar_cpf],
+        help_text="Somente números.",
+    )
 
     data_nascimento = models.DateField()
     celular = models.CharField(max_length=30, null=True, blank=True)
@@ -69,6 +69,14 @@ class Aluno(models.Model):
         null=True,
         blank=True,
         related_name="alunos"
+    )
+
+    responsavel_pedagogico = models.ForeignKey(
+        Responsavel,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alunos_pedagogico",
     )
 
     class Meta:

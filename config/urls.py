@@ -8,6 +8,7 @@ urlpatterns = [
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("alunos/", include("apps.alunos.urls")),
+    path("importacao/", include("apps.importacao.urls")),
     path("encontros/", include("apps.encontros.urls")),
     path("usuarios/", include("apps.usuarios.urls")),
     path("", InicioView.as_view(), name="home"),
