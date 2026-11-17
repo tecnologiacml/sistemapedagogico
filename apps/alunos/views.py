@@ -1,3 +1,4 @@
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
@@ -8,6 +9,7 @@ from django.views.generic import (
 
 from .forms import AlunoForm
 from .models import Aluno
+from .validators import somente_digitos
 
 
 class PodeEditarMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -27,18 +29,27 @@ class AlunoListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = Aluno.objects.select_related("responsavel").order_by("nome")
         self.q = self.request.GET.get("q", "").strip()
+
         if self.q:
-            qs = qs.filter(
+            filtro = (
                 Q(nome__icontains=self.q)
                 | Q(ra__icontains=self.q)
+                | Q(matricula__icontains=self.q)
             )
+
+            digitos = somente_digitos(self.q)
+
+            if digitos:
+                filtro |= Q(cpf__contains=digitos)
+
+            qs = qs.filter(filtro)
+
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = self.q
         return ctx
-    
 
 
 class AlunoDetailView(LoginRequiredMixin, DetailView):

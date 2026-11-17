@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Encontro {{ object.numero }} · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<h1 class="h3 mb-1">{{ object.aluno.nome }}</h1>
+<p class="text-muted">{{ object.aluno.ra|default:"" }} · {{ object.aluno.serie }} · Encontro {{ object.numero }} em {{ object.data|date:"d/m/Y" }}</p>
+<div class="card card-body shadow-sm">
+  <dl class="row mb-0">
+    <dt class="col-sm-4">Presença</dt><dd class="col-sm-8">{% if object.presente %}Sim{% else %}Não{% endif %}</dd>
+    <dt class="col-sm-4">Duração</dt><dd class="col-sm-8">{{ object.get_duracao_display|default:"—" }}</dd>
+    <dt class="col-sm-4">Combinados anteriores</dt><dd class="col-sm-8">{{ object.get_combinados_anteriores_display|default:"—" }}</dd>
+    <dt class="col-sm-4">Temas tratados</dt><dd class="col-sm-8">{{ object.temas|join:", "|default:"—" }}</dd>
+    <dt class="col-sm-4">Próximos combinados</dt><dd class="col-sm-8">{{ object.combinados_proximo|default:"—"|linebreaksbr }}</dd>
+    <dt class="col-sm-4">Hábitos / rotina</dt><dd class="col-sm-8">{{ object.habitos|default:"—" }}</dd>
+    <dt class="col-sm-4">Hobbies / interesses</dt><dd class="col-sm-8">{{ object.hobbies|default:"—" }}</dd>
+    <dt class="col-sm-4">Pontos fortes</dt><dd class="col-sm-8">{{ object.pontos_fortes|default:"—" }}</dd>
+    <dt class="col-sm-4">Pontos fracos</dt><dd class="col-sm-8">{{ object.pontos_fracos|default:"—" }}</dd>
+    <dt class="col-sm-4">Carreira desejada</dt><dd class="col-sm-8">{{ object.carreira_desejada|default:"—" }}</dd>
+    <dt class="col-sm-4">Sabe usar o Plurall?</dt><dd class="col-sm-8">{% if object.sabe_plurall is None %}—{% elif object.sabe_plurall %}Sim{% else %}Não{% endif %}</dd>
+    <dt class="col-sm-4">Encaminhamento</dt><dd class="col-sm-8">{{ object.get_encaminhamento_display }}{% if object.motivo_encaminhamento %} · {{ object.motivo_encaminhamento }}{% endif %}</dd>
+    <dt class="col-sm-4">Observações</dt><dd class="col-sm-8">{{ object.observacoes|default:"—"|linebreaksbr }}</dd>
+  </dl>
+</div>
+<a class="btn btn-outline-secondary mt-3" href="{% url 'encontros:lista' %}">Voltar</a>
+{% endblock %}

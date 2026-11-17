@@ -22,11 +22,26 @@ class AlunoForm(forms.ModelForm):
     class Meta:
         model = Aluno
         fields = [
-            "nome", "matricula", "ra", "serie", "unidade", "data_nascimento",
-            "celular", "email", "endereco", "bairro", "cidade", "cep",
+            "nome",
+            "matricula",
+            "ra",
+            "serie",
+            "cpf",
+            "unidade",
+            "data_nascimento",
+            "celular",
+            "email",
+            "endereco",
+            "bairro",
+            "cidade",
+            "cep",
         ]
+
         widgets = {
-            "data_nascimento": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "data_nascimento": forms.DateInput(
+                attrs={"type": "date"},
+                format="%Y-%m-%d"
+            ),
         }
 
     def clean_nome(self):
