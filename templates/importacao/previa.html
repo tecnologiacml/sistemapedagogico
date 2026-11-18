@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block titulo %}Prévia da importação · Sistema Pedagógico{% endblock %}
@@ -50,9 +49,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <h1 class="h3 mb-1">Prévia da importação</h1>
-        <span class="text-muted small">
-            {{ imp.arquivo_nome }} · Unidade {{ imp.unidade }}
-        </span>
+        <span class="text-muted small">{{ imp.arquivo_nome }}</span>
     </div>
 </div>
 
@@ -111,6 +108,44 @@
     </div>
 
 </div>
+
+<!-- UNIDADE DOS ALUNOS NOVOS -->
+{% if sem_unidade %}
+<div class="alert alert-warning">
+    <form
+        method="post"
+        action="{% url 'importacao:previa' imp.pk %}"
+        class="row g-2 align-items-end">
+
+        {% csrf_token %}
+        <input type="hidden" name="acao" value="definir_unidade">
+
+        <div class="col-12">
+            <strong>{{ sem_unidade }} aluno(s) novo(s) ainda sem unidade.</strong>
+            Escolha a unidade para aplicar a todos de uma vez. Se o arquivo
+            mistura as duas, aplique a mais comum e ajuste os outros em
+            “Editar”. Só é possível confirmar depois que todos tiverem unidade.
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label mb-1">Unidade</label>
+            <select name="unidade" class="form-select" required>
+                <option value="">Selecione…</option>
+                {% for valor, rotulo in unidades %}
+                <option value="{{ valor }}">{{ rotulo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-auto">
+            <button type="submit" class="btn btn-warning">
+                Aplicar aos {{ sem_unidade }} aluno(s)
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endif %}
 
 {% if imp.colunas_ignoradas %}
 <div class="alert alert-secondary">
@@ -213,10 +248,13 @@
                         <th>Ação</th>
                         <th>Aluno</th>
                         <th>R.A.</th>
+                        <th>CPF</th>
+                        <th>Unidade</th>
                         <th>Série</th>
                         <th>Idade</th>
                         <th>Responsável financeiro</th>
                         <th>Idade do responsável</th>
+                        <th>Responsável pedagógico</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
@@ -241,6 +279,18 @@
 
                         <td>{{ l.dados.ra|default:"—" }}</td>
 
+                        <td>{{ l.dados.cpf|default:"—" }}</td>
+
+                        <td>
+                            {% if l.dados.unidade %}
+                            {{ l.dados.unidade }}
+                            {% elif l.acao == "atualizar" %}
+                            <span class="text-muted">mantém</span>
+                            {% else %}
+                            <span class="badge text-bg-warning">definir</span>
+                            {% endif %}
+                        </td>
+
                         <td>{{ l.dados.serie|default:"—" }}</td>
 
                         <td>{{ l.dados.idade }}</td>
@@ -248,6 +298,8 @@
                         <td>{{ l.dados.resp_nome|default:"—" }}</td>
 
                         <td>{{ l.dados.idade_responsavel }}</td>
+
+                        <td>{{ l.dados.ped_nome|default:"—" }}</td>
 
                         <td>
                             <div class="acoes-importacao">
@@ -349,7 +401,7 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label">R.A.</label>
+                        <label class="form-label">R.A. (registro do aluno)</label>
                         <input
                             type="text"
                             name="ra"
@@ -377,15 +429,26 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label">Matrícula</label>
+                        <label class="form-label">CPF</label>
                         <input
                             type="text"
-                            name="matricula"
+                            name="cpf"
                             class="form-control"
-                            value="{{ l.dados.matricula }}">
+                            inputmode="numeric"
+                            value="{{ l.dados.cpf }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        <label class="form-label">Unidade</label>
+                        <select name="unidade" class="form-select">
+                            <option value="">{% if l.acao == "atualizar" %}Manter a atual{% else %}—{% endif %}</option>
+                            {% for valor, rotulo in unidades %}
+                            <option value="{{ valor }}" {% if l.dados.unidade == valor %}selected{% endif %}>{{ rotulo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
                         <label class="form-label">Série</label>
                         <input
                             type="text"
@@ -394,7 +457,17 @@
                             value="{{ l.dados.serie }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        <label class="form-label">Responsável pedagógico</label>
+                        <input
+                            type="text"
+                            name="ped_nome"
+                            class="form-control"
+                            maxlength="255"
+                            value="{{ l.dados.ped_nome }}">
+                    </div>
+
+                    <div class="col-md-4">
                         <label class="form-label">Celular</label>
                         <input
                             type="text"
@@ -403,7 +476,7 @@
                             value="{{ l.dados.celular }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">E-mail</label>
                         <input
                             type="email"
@@ -412,7 +485,7 @@
                             value="{{ l.dados.email }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">CEP</label>
                         <input
                             type="text"
@@ -421,7 +494,7 @@
                             value="{{ l.dados.cep }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Endereço</label>
                         <input
                             type="text"
@@ -430,7 +503,7 @@
                             value="{{ l.dados.endereco }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Bairro</label>
                         <input
                             type="text"
@@ -439,7 +512,7 @@
                             value="{{ l.dados.bairro }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Cidade</label>
                         <input
                             type="text"
@@ -451,7 +524,7 @@
                 </div>
             </div>
 
-            <!-- DADOS DO RESPONSÁVEL -->
+            <!-- DADOS DO RESPONSÁVEL FINANCEIRO -->
             <div class="secao-edicao">
 
                 <h3 class="h6 mb-3">Responsável financeiro</h3>
@@ -512,7 +585,7 @@
                             value="{{ l.dados.resp_cep }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Endereço</label>
                         <input
                             type="text"
@@ -521,7 +594,7 @@
                             value="{{ l.dados.resp_endereco }}">
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Bairro</label>
                         <input
                             type="text"
@@ -581,7 +654,8 @@
         name="acao"
         value="confirmar"
         class="btn btn-success"
-        {% if imp.total_validas == 0 %}disabled{% endif %}
+        {% if imp.total_validas == 0 or sem_unidade %}disabled{% endif %}
+        {% if sem_unidade %}title="Defina a unidade dos alunos novos antes de confirmar"{% endif %}
         onclick="return confirm('Deseja realmente confirmar a importação dos {{ imp.total_validas }} aluno(s) válido(s)?');">
 
         Confirmar importação
