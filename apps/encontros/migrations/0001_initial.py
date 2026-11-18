@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("alunos", "0003_aluno_ra_aluno_serie"),
+        ("alunos", "0006_aluno_responsavel_pedagogico"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

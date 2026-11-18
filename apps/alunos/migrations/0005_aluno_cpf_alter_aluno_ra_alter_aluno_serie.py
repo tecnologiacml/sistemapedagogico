@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('alunos', '0004_merge_20261117_1253'),
+        ('alunos', '0003_responsavel_alter_aluno_options_remove_aluno_cpf_and_more'),
     ]
 
     operations = [

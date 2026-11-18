@@ -71,11 +71,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='aluno',
-            name='matricula',
-            field=models.CharField(blank=True, max_length=50, null=True, unique=True),
-        ),
-        migrations.AddField(
-            model_name='aluno',
             name='ra',
             field=models.CharField(blank=True, max_length=50, null=True, verbose_name='Registro do aluno (RA)'),
         ),
