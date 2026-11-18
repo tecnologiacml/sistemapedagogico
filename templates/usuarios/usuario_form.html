@@ -8,17 +8,31 @@
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
       {% for campo in form %}
-        <div class="mb-3{% if campo.field.widget.input_type == 'checkbox' %} form-check{% endif %}">
-          {% if campo.field.widget.input_type == 'checkbox' %}
-            {{ campo }}<label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
-          {% else %}
-            <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
-            {{ campo }}
-          {% endif %}
-          {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
-          {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+  {% if campo.field.widget.allow_multiple_selected %}
+    <fieldset class="mb-3">
+      <legend class="form-label fs-6">{{ campo.label }}</legend>
+      {% for opcao in campo %}
+        <div class="form-check">
+          {{ opcao.tag }}
+          <label class="form-check-label" for="{{ opcao.id_for_label }}">{{ opcao.choice_label }}</label>
         </div>
       {% endfor %}
+      {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+      {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+    </fieldset>
+  {% else %}
+    <div class="mb-3{% if campo.field.widget.input_type == 'checkbox' %} form-check{% endif %}">
+      {% if campo.field.widget.input_type == 'checkbox' %}
+        {{ campo }}<label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+      {% else %}
+        <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+        {{ campo }}
+      {% endif %}
+      {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+      {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{% endfor %}
       <div class="d-flex gap-2">
         <button class="btn btn-primary">Salvar</button>
         <a class="btn btn-outline-secondary" href="{% url 'usuarios:lista' %}">Cancelar</a>
