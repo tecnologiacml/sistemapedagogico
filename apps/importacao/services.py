@@ -1,7 +1,11 @@
-"""Leitura, validação e gravação de alunos a partir de CSV.
+# Destino: apps/importacao/services.py
+"""Leitura, validação e gravação de alunos a partir de CSV (US-010, US-011, US-012).
 
 Fluxo: criar_previa() valida tudo SEM gravar alunos -> confirmar() grava linha a linha.
 Cada linha é gravada isolada: se uma falhar, as outras continuam e o motivo fica no log.
+
+Unidade é OPCIONAL: pode vir na coluna "Unidade" do CSV, como padrão escolhido no
+upload, ou ser definida depois na prévia. Se nada for informado, o aluno é cadastrado sem unidade.
 """
 import csv
 import io
@@ -10,6 +14,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
@@ -47,23 +52,29 @@ ALIAS_ALUNO = {
     "nome": {"aluno", "nome", "nome do aluno", "nome completo"},
     "data_nascimento": {"data de nascimento", "data nascimento", "nascimento", "data nasc", "dt nascimento"},
     "ra": {"ra", "r a", "registro do aluno", "registro do aluno ra"},
-    "matricula": {"matricula", "n matricula", "numero da matricula"},
+    "cpf": {"cpf", "cpf do aluno"},
+    "unidade": {"unidade", "unidade escolar", "campus"},
     "serie": {"serie", "ano serie", "serie ano"},
+    "responsavel_pedagogico": {"orientador", "orientadora", "orientador pedagogico", "orientadora pedagogica",
+                               "responsavel pedagogico", "responsavel pedagogica"},
     "celular": {"celular", "telefone", "celular do aluno", "telefone do aluno"},
     "email": {"email", "e mail", "email do aluno"},
     "endereco": {"endereco"},
     "bairro": {"bairro"},
     "cidade": {"cidade"},
     "cep": {"cep"},
-    "unidade": {"unidade", "unidade do aluno"},
 }
 
 
 def _campo_do_cabecalho(h):
+    # "Responsável pedagógico" (orientador) NÃO é o responsável da família:
+    # tem de ser reconhecido antes da regra de "responsavel" abaixo.
+    if h in ALIAS_ALUNO["responsavel_pedagogico"]:
+        return "responsavel_pedagogico"
     palavras = set(h.split())
     if "responsavel" in palavras:
-        if "idade" in palavras:
-            return None
+        if "idade" in palavras or "cpf" in palavras:
+            return None  # idade é calculada; CPF do responsável não é guardado
         if "email" in palavras or {"e", "mail"} <= palavras:
             return "resp_email"
         if "celular" in palavras or "telefone" in palavras:
@@ -108,7 +119,10 @@ def ler_csv(conteudo):
     cabecalho = next(leitor)
     mapa, ignoradas = {}, []
     for idx, original in enumerate(cabecalho):
-        campo = _campo_do_cabecalho(_cabecalho(original))
+        h = _cabecalho(original)
+        if "idade" in h.split():
+            continue  # coluna calculada pelo sistema: some sem aparecer como "não reconhecida"
+        campo = _campo_do_cabecalho(h)
         if campo and campo not in mapa.values():
             mapa[idx] = campo
         elif original.strip():
@@ -153,7 +167,8 @@ def _data(texto):
 
 
 def _codigo(texto):
-    return re.sub(r"\.0$", "", (texto or "").strip())  # Excel grava 123 como 123.0
+    v = re.sub(r"\.0$", "", (texto or "").strip())  # Excel grava 123 como 123.0
+    return v
 
 
 def _celular(texto):
@@ -176,6 +191,34 @@ def _email_valido(email):
         return False
 
 
+def _cpf(texto):
+    """Devolve só os 11 dígitos do CPF se for válido; None se inválido. Em branco devolve ""."""
+    d = re.sub(r"\D", "", texto or "")
+    if not d:
+        return ""
+    if len(d) != 11 or d == d[0] * 11:
+        return None
+    for tamanho in (9, 10):
+        soma = sum(int(n) * p for n, p in zip(d[:tamanho], range(tamanho + 1, 1, -1)))
+        digito = (soma * 10 % 11) % 10
+        if digito != int(d[tamanho]):
+            return None
+    return d
+
+
+def _unidade(texto):
+    """Devolve o valor válido de Aluno.Unidade para o texto informado, ou "" se não reconhecer.
+
+    Aceita tanto o valor gravado no banco quanto o rótulo, sem diferenciar acento/maiúscula.
+    """
+    texto = (texto or "").strip()
+    if not texto:
+        return ""
+    mapa = {sem_acento(v).upper(): v for v in Aluno.Unidade.values}
+    mapa.update({sem_acento(rotulo).upper(): v for v, rotulo in Aluno.Unidade.choices})
+    return mapa.get(sem_acento(texto).upper(), "")
+
+
 def validar_campos(bruto):
     """Devolve (dados_limpos, erros, avisos). erro = rejeita a linha; aviso = importa sem o campo."""
     erros, avisos, d = [], [], {}
@@ -195,12 +238,25 @@ def validar_campos(bruto):
         erros.append(f"Data de nascimento inválida: {problema}")
     d["data_nascimento"] = nasc.isoformat() if nasc else ""
 
-    for campo, rotulo in (("ra", "R.A."), ("matricula", "Matrícula")):
+    for campo, rotulo in (("ra", "R.A."),):
         v = _codigo(bruto.get(campo, ""))
         if v and not re.fullmatch(r"[A-Za-z0-9._-]{1,50}", v):
             erros.append(f"{rotulo} inválido (use só letras, números, ponto, hífen; até 50 caracteres)")
             v = ""
         d[campo] = v
+
+    # CPF é opcional: inválido vira aviso e o aluno entra sem CPF
+    cpf_txt = (bruto.get("cpf") or "").strip()
+    cpf = _cpf(cpf_txt)
+    d["cpf"] = cpf or ""
+    if cpf_txt and cpf is None:
+        avisos.append("CPF do aluno inválido (não importado)")
+
+    # unidade é opcional: em branco ou não reconhecida = aluno sem unidade (não rejeita a linha)
+    unidade_txt = (bruto.get("unidade") or "").strip()
+    d["unidade"] = _unidade(unidade_txt)
+    if unidade_txt and not d["unidade"]:
+        avisos.append(f'Unidade "{unidade_txt}" não reconhecida (aluno importado sem unidade)')
 
     email = (bruto.get("email") or "").strip().lower()
     if email and not _email_valido(email):
@@ -218,18 +274,18 @@ def validar_campos(bruto):
     if cep.strip() and not d["cep"]:
         avisos.append("CEP do aluno inválido (não importado)")
 
-    for campo in ("endereco", "bairro", "cidade", "serie"):
+    for campo in ("endereco", "bairro", "cidade", "serie", "responsavel_pedagogico"):
         d[campo] = (bruto.get(campo) or "").strip()[: 50 if campo == "serie" else 255]
 
     # responsável
-    campos_resp = ("resp_email", "resp_celular", "resp_cep", "resp_endereco", "resp_bairro", "resp_data_nascimento")
     rnome = re.sub(r"\s+", " ", bruto.get("resp_nome", "")).strip()
     d["resp_nome"] = rnome[:255]
-    outros = any(bruto.get(c, "").strip() for c in campos_resp)
+    outros = any(bruto.get(c, "").strip() for c in
+                 ("resp_email", "resp_celular", "resp_cep", "resp_endereco", "resp_bairro", "resp_data_nascimento"))
     if not rnome:
         if outros:
             avisos.append("Dados do responsável ignorados: nome do responsável em branco")
-        for c in campos_resp:
+        for c in ("resp_email", "resp_celular", "resp_cep", "resp_endereco", "resp_bairro", "resp_data_nascimento"):
             d[c] = ""
     else:
         remail = (bruto.get("resp_email") or "").strip().lower()
@@ -258,35 +314,46 @@ def validar_campos(bruto):
 def analisar(conteudo, atualizar_existentes):
     linhas, ignoradas = ler_csv(conteudo)
 
-    existentes = list(Aluno.objects.values("id", "nome", "ra", "matricula", "data_nascimento"))
+    existentes = list(Aluno.objects.values("id", "nome", "ra", "cpf", "data_nascimento"))
     por_ra = {a["ra"]: a for a in existentes if a["ra"]}
-    por_matricula = {a["matricula"]: a for a in existentes if a["matricula"]}
+    por_cpf = {re.sub(r"\D", "", a["cpf"]): a for a in existentes if a["cpf"]}
     por_nome_nasc = {}
     for a in existentes:
         por_nome_nasc.setdefault((chave_nome(a["nome"]), a["data_nascimento"]), []).append(a)
 
-    vistos_ra, vistos_matricula, vistos_nome_nasc = {}, {}, {}
+    orientadores = {}
+    for u in get_user_model().objects.filter(perfil="orientador", is_active=True):
+        orientadores[u.email.lower()] = u.pk
+        orientadores[chave_nome(u.get_full_name() or u.username)] = u.pk
+        orientadores[chave_nome(u.username)] = u.pk
+
+    vistos_ra, vistos_nome_nasc, vistos_cpf = {}, {}, {}
     resultado = []
     for numero, bruto in linhas:
         d, erros, avisos = validar_campos(bruto)
         acao, aluno_id = "criar", None
 
+        d["responsavel_pedagogico_id"] = None
+        if d["responsavel_pedagogico"]:
+            achado = orientadores.get(d["responsavel_pedagogico"].lower()) or orientadores.get(chave_nome(d["responsavel_pedagogico"]))
+            if achado:
+                d["responsavel_pedagogico_id"] = achado
+            else:
+                avisos.append("Responsável pedagógico não encontrado entre os usuários com perfil orientador (aluno importado sem ele)")
+
         if d["nome"] and d["data_nascimento"]:
             nasc = date.fromisoformat(d["data_nascimento"])
             chave = (chave_nome(d["nome"]), nasc)
-            ra, matricula = d["ra"], d["matricula"]
+            ra = d["ra"]
 
             # duplicidade dentro do próprio arquivo
             if ra and ra in vistos_ra:
                 erros.append(f"R.A. repetido no arquivo (já aparece na linha {vistos_ra[ra]})")
-            if matricula and matricula in vistos_matricula:
-                erros.append(f"Matrícula repetida no arquivo (já aparece na linha {vistos_matricula[matricula]})")
             if chave in vistos_nome_nasc:
                 erros.append(f"Aluno duplicado no arquivo (mesmo nome e data de nascimento da linha {vistos_nome_nasc[chave]})")
 
             # duplicidade contra o banco
             alvo = None
-            motivo_dup = ""
             if ra and ra in por_ra:
                 alvo = por_ra[ra]
                 if chave_nome(alvo["nome"]) != chave_nome(d["nome"]):
@@ -305,19 +372,26 @@ def analisar(conteudo, atualizar_existentes):
                     else:
                         alvo = c
                         motivo_dup = f"Aluno já cadastrado (mesmo nome e data de nascimento, nº {c['id']})"
+            # CPF repetido no arquivo ou já pertencente a outro aluno
+            cpf = d["cpf"]
+            if cpf:
+                if cpf in vistos_cpf:
+                    erros.append(f"CPF repetido no arquivo (já aparece na linha {vistos_cpf[cpf]})")
+                dono = por_cpf.get(cpf)
+                if dono and (alvo is None or dono["id"] != alvo["id"]):
+                    erros.append(f"CPF já cadastrado para outro aluno (nº {dono['id']})")
+
             if alvo and not erros:
                 if atualizar_existentes:
                     acao, aluno_id = "atualizar", alvo["id"]
                 else:
-                    erros.append(motivo_dup + '. Marque "Atualizar alunos já cadastrados" para alterá-lo')
-            if matricula and matricula in por_matricula and (aluno_id != por_matricula[matricula]["id"]):
-                erros.append(f"Matrícula já usada por outro aluno (nº {por_matricula[matricula]['id']})")
+                    erros.append(motivo_dup + ". Marque \"Atualizar alunos já cadastrados\" para alterá-lo")
 
             if not erros:  # só linhas boas "reservam" o valor para detectar repetidos depois
                 if ra:
                     vistos_ra[ra] = numero
-                if matricula:
-                    vistos_matricula[matricula] = numero
+                if d["cpf"]:
+                    vistos_cpf[d["cpf"]] = numero
                 vistos_nome_nasc[chave] = numero
 
         resultado.append({
@@ -328,12 +402,10 @@ def analisar(conteudo, atualizar_existentes):
 
 
 @transaction.atomic
-def criar_previa(usuario, nome_arquivo, conteudo, unidade, atualizar_existentes):
+def criar_previa(usuario, nome_arquivo, conteudo, atualizar_existentes=False, unidade=""):
+    """Cria a prévia. `unidade` (opcional) é só o PADRÃO das linhas que vierem sem unidade no CSV."""
+    unidade = unidade or ""
     resultado, ignoradas = analisar(conteudo, atualizar_existentes)
-    
-    if not unidade:
-        unidade = Aluno.Unidade.CENTRO
-
     imp = Importacao.objects.create(
         usuario=usuario, arquivo_nome=nome_arquivo[:255], unidade=unidade,
         atualizar_existentes=atualizar_existentes, colunas_ignoradas=", ".join(ignoradas),
@@ -342,7 +414,15 @@ def criar_previa(usuario, nome_arquivo, conteudo, unidade, atualizar_existentes)
     novas = []
     for r in resultado:
         com_erro = bool(r["erros"])
-        dados = {} if com_erro else {**r["dados"], "_acao": r["acao"], "_aluno_id": r["aluno_id"]}
+        if com_erro:
+            dados = {}
+        else:
+            dados = {
+                **r["dados"],
+                "unidade": r["dados"].get("unidade") or unidade,
+                "_acao": r["acao"],
+                "_aluno_id": r["aluno_id"],
+            }
         novas.append(ImportacaoLinha(
             importacao=imp, numero_linha=r["numero"], nome=r["nome"][:255], ra=r["ra"][:50],
             situacao=ImportacaoLinha.Situacao.ERRO if com_erro else ImportacaoLinha.Situacao.VALIDA,
@@ -396,7 +476,7 @@ def _gravar(d, importacao, usuario):
     responsavel = _obter_responsavel(d, usuario)
     campos = {
         "nome": d["nome"], "data_nascimento": date.fromisoformat(d["data_nascimento"]),
-        "ra": d["ra"], "matricula": d["matricula"], "celular": d["celular"], "email": d["email"],
+        "ra": d["ra"], "cpf": d.get("cpf", ""), "celular": d["celular"], "email": d["email"],
         "endereco": d["endereco"], "bairro": d["bairro"], "cidade": d["cidade"],
         "cep": d["cep"], "serie": d["serie"],
     }
@@ -405,8 +485,12 @@ def _gravar(d, importacao, usuario):
         for chave, valor in campos.items():
             if valor not in ("", None):
                 setattr(aluno, chave, valor)
+        if d.get("unidade"):  # só troca a unidade se veio uma
+            aluno.unidade = d["unidade"]
         if responsavel:
             aluno.responsavel = responsavel
+        if d.get("responsavel_pedagogico_id"):
+            aluno.responsavel_pedagogico_id = d["responsavel_pedagogico_id"]
         extra = {}
         _auditoria(extra, usuario, criando=False)
         for chave, valor in extra.items():
@@ -416,7 +500,8 @@ def _gravar(d, importacao, usuario):
     extra = {}
     _auditoria(extra, usuario, criando=True)
     aluno = Aluno(
-        unidade=importacao.unidade, responsavel=responsavel,
+        unidade=d.get("unidade") or importacao.unidade or "",
+        responsavel=responsavel, responsavel_pedagogico_id=d.get("responsavel_pedagogico_id"),
         **{k: _vazio_para_none(v) for k, v in campos.items()}, **extra,
     )
     aluno.save()
@@ -470,10 +555,10 @@ def cancelar(importacao):
 
 
 MODELO_CSV = (
-    "Aluno;Data de nascimento;RA;Matrícula;Série;Celular;Email;Endereço;Bairro;Cidade;CEP;"
+    "Aluno;Data de nascimento;RA;Série;Responsável pedagógico;Celular;Email;Endereço;Bairro;Cidade;CEP;"
     "Responsável financeiro;Email do responsável;Celular do responsável;"
     "Data de nascimento do responsável;CEP do responsável;Endereço do responsável;Bairro do responsável\r\n"
-    "Maria Exemplo da Silva;15/03/2012;2026010001;123456;6º Ano EF;79999990000;maria@exemplo.com;"
+    "Maria Exemplo da Silva;15/03/2012;2026010001;6º Ano EF;orientador@exemplo.com;79999990000;maria@exemplo.com;"
     "Rua Exemplo 100;Centro;Itabaiana;49500-000;José Exemplo da Silva;jose@exemplo.com;79988880000;"
     "20/08/1980;49500-000;Rua Exemplo 100;Centro\r\n"
 )
