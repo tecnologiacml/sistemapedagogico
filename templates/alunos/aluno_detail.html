@@ -12,12 +12,13 @@
 <div class="card shadow-sm mb-3"><div class="card-body">
   <h2 class="h5 mb-3">Dados do aluno</h2>
   <dl class="row mb-0">
-    <dt class="col-sm-3">Celular</dt><dd class="col-sm-9">{{ object.celular_formatado|default:"—" }}</dd>
     <dt class="col-sm-3">RA</dt><dd class="col-sm-9">{{ object.ra|default:"—" }}</dd>
     <dt class="col-sm-3">Série</dt><dd class="col-sm-9">{{ object.serie|default:"—" }}</dd>
     <dt class="col-sm-3">Unidade</dt><dd class="col-sm-9">{{ object.unidade }}</dd>
+    <dt class="col-sm-3">Responsável pedagógico</dt>
+    <dd class="col-sm-9">{% if object.responsavel_pedagogico %}{{ object.responsavel_pedagogico.get_full_name|default:object.responsavel_pedagogico.username }}{% else %}—{% endif %}</dd>
     <dt class="col-sm-3">Nascimento</dt><dd class="col-sm-9">{{ object.data_nascimento|date:"d/m/Y" }} ({{ object.idade }} anos)</dd>
-    <dt class="col-sm-3">Celular</dt><dd class="col-sm-9">{{ object.celular|default:"—" }}</dd>
+    <dt class="col-sm-3">Celular</dt><dd class="col-sm-9">{{ object.celular_formatado|default:"—" }}</dd>
     <dt class="col-sm-3">E-mail</dt><dd class="col-sm-9">{{ object.email|default:"—" }}</dd>
     <dt class="col-sm-3">Endereço</dt>
     <dd class="col-sm-9">
@@ -27,7 +28,7 @@
 </div></div>
 
 <div class="card shadow-sm"><div class="card-body">
-  <h2 class="h5 mb-3">Responsável</h2>
+  <h2 class="h5 mb-3">Responsável (pai, mãe, avós ou outro)</h2>
   {% if object.responsavel %}
   <dl class="row mb-0">
     <dt class="col-sm-3">Nome</dt><dd class="col-sm-9">{{ object.responsavel.nome }}</dd>
@@ -35,7 +36,8 @@
     <dt class="col-sm-3">E-mail</dt><dd class="col-sm-9">{{ object.responsavel.email|default:"—" }}</dd>
   </dl>
   {% else %}
-  <p class="text-muted mb-0">Nenhum responsável vinculado.</p>
+  <p class="text-muted mb-2">Nenhum responsável vinculado.</p>
+  {% if user.pode_editar_alunos %}<a class="btn btn-outline-primary btn-sm" href="{% url 'alunos:editar' object.pk %}#responsavel">Adicionar responsável</a>{% endif %}
   {% endif %}
 </div></div>
 

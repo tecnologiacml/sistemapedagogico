@@ -1,7 +1,11 @@
-"""Leitura, validação e gravação de alunos a partir de CSV.
+# Destino: apps/importacao/services.py
+"""Leitura, validação e gravação de alunos a partir de CSV (US-010, US-011, US-012).
 
 Fluxo: criar_previa() valida tudo SEM gravar alunos -> confirmar() grava linha a linha.
 Cada linha é gravada isolada: se uma falhar, as outras continuam e o motivo fica no log.
+
+Unidade é OPCIONAL: pode vir na coluna "Unidade" do CSV, como padrão escolhido no
+upload, ou ser definida depois na prévia. Se nada for informado, o aluno é cadastrado sem unidade.
 """
 import csv
 import io
@@ -10,13 +14,13 @@ import re
 import unicodedata
 from datetime import date, datetime
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.utils import timezone
 
 from apps.alunos.models import Aluno, Responsavel
-from apps.alunos.validators import validar_cpf
 
 from .models import Importacao, ImportacaoLinha
 
@@ -47,12 +51,12 @@ def _cabecalho(texto):
 ALIAS_ALUNO = {
     "nome": {"aluno", "nome", "nome do aluno", "nome completo"},
     "data_nascimento": {"data de nascimento", "data nascimento", "nascimento", "data nasc", "dt nascimento"},
-    "idade": {"idade", "idade do aluno"},  # lida e descartada: a idade é calculada pela data de nascimento
     "ra": {"ra", "r a", "registro do aluno", "registro do aluno ra"},
     "cpf": {"cpf", "cpf do aluno"},
-    "matricula": {"matricula", "n matricula", "numero da matricula"},
-    "unidade": {"unidade", "unidade do aluno"},
+    "unidade": {"unidade", "unidade escolar", "campus"},
     "serie": {"serie", "ano serie", "serie ano"},
+    "responsavel_pedagogico": {"orientador", "orientadora", "orientador pedagogico", "orientadora pedagogica",
+                               "responsavel pedagogico", "responsavel pedagogica"},
     "celular": {"celular", "telefone", "celular do aluno", "telefone do aluno"},
     "email": {"email", "e mail", "email do aluno"},
     "endereco": {"endereco"},
@@ -62,33 +66,28 @@ ALIAS_ALUNO = {
 }
 
 
-def _sufixo_responsavel(palavras):
-    if "idade" in palavras:
-        return "idade"
-    if "email" in palavras or {"e", "mail"} <= palavras:
-        return "email"
-    if "celular" in palavras or "telefone" in palavras:
-        return "celular"
-    if "cep" in palavras:
-        return "cep"
-    if "endereco" in palavras:
-        return "endereco"
-    if "bairro" in palavras:
-        return "bairro"
-    if "nascimento" in palavras or "nasc" in palavras:
-        return "data_nascimento"
-    return "nome"
-
-
 def _campo_do_cabecalho(h):
+    # "Responsável pedagógico" (orientador) NÃO é o responsável da família:
+    # tem de ser reconhecido antes da regra de "responsavel" abaixo.
+    if h in ALIAS_ALUNO["responsavel_pedagogico"]:
+        return "responsavel_pedagogico"
     palavras = set(h.split())
-    if "responsavel" in palavras or "pedagogico" in palavras:
-        # "pedagogico" -> responsável pedagógico (ped_*); senão, responsável financeiro (resp_*)
-        prefixo = "ped" if "pedagogico" in palavras else "resp"
-        sufixo = _sufixo_responsavel(palavras)
-        if prefixo == "ped" and sufixo != "nome":
-            return None  # do responsável pedagógico guardamos só o nome
-        return f"{prefixo}_{sufixo}"
+    if "responsavel" in palavras:
+        if "idade" in palavras or "cpf" in palavras:
+            return None  # idade é calculada; CPF do responsável não é guardado
+        if "email" in palavras or {"e", "mail"} <= palavras:
+            return "resp_email"
+        if "celular" in palavras or "telefone" in palavras:
+            return "resp_celular"
+        if "cep" in palavras:
+            return "resp_cep"
+        if "endereco" in palavras:
+            return "resp_endereco"
+        if "bairro" in palavras:
+            return "resp_bairro"
+        if "nascimento" in palavras or "nasc" in palavras:
+            return "resp_data_nascimento"
+        return "resp_nome"
     for campo, apelidos in ALIAS_ALUNO.items():
         if h in apelidos:
             return campo
@@ -120,7 +119,10 @@ def ler_csv(conteudo):
     cabecalho = next(leitor)
     mapa, ignoradas = {}, []
     for idx, original in enumerate(cabecalho):
-        campo = _campo_do_cabecalho(_cabecalho(original))
+        h = _cabecalho(original)
+        if "idade" in h.split():
+            continue  # coluna calculada pelo sistema: some sem aparecer como "não reconhecida"
+        campo = _campo_do_cabecalho(h)
         if campo and campo not in mapa.values():
             mapa[idx] = campo
         elif original.strip():
@@ -165,7 +167,8 @@ def _data(texto):
 
 
 def _codigo(texto):
-    return re.sub(r"\.0$", "", (texto or "").strip())  # Excel grava 123 como 123.0
+    v = re.sub(r"\.0$", "", (texto or "").strip())  # Excel grava 123 como 123.0
+    return v
 
 
 def _celular(texto):
@@ -180,21 +183,6 @@ def _cep(texto):
     return f"{d[:5]}-{d[5:]}" if len(d) == 8 else None
 
 
-def _cpf(texto):
-    """(cpf_com_11_digitos|"", erro|None). O Excel pode ter tirado zeros à esquerda."""
-    d = re.sub(r"\D", "", texto or "")
-    if not d:
-        return "", None
-    d = d.zfill(11)
-    if len(d) != 11:
-        return "", "deve ter 11 dígitos"
-    try:
-        validar_cpf(d)
-    except ValidationError:
-        return "", "número inválido"
-    return d, None
-
-
 def _email_valido(email):
     try:
         validate_email(email)
@@ -203,43 +191,32 @@ def _email_valido(email):
         return False
 
 
-def _validar_responsavel(bruto, p, rotulo, erros, avisos):
-    """Valida os campos de um responsável. p = prefixo: 'resp' (financeiro) ou 'ped' (pedagógico)."""
-    d = {}
-    campos = ("email", "celular", "cep", "endereco", "bairro", "data_nascimento")
-    nome = re.sub(r"\s+", " ", bruto.get(f"{p}_nome", "")).strip()
-    d[f"{p}_nome"] = nome[:255]
-    if not nome:
-        if any(bruto.get(f"{p}_{c}", "").strip() for c in campos):
-            avisos.append(f"Dados do {rotulo} ignorados: nome em branco")
-        for c in campos:
-            d[f"{p}_{c}"] = ""
-        return d
-
-    email = (bruto.get(f"{p}_email") or "").strip().lower()
-    if email and not _email_valido(email):
-        erros.append(f"E-mail do {rotulo} inválido")
-        email = ""
-    d[f"{p}_email"] = email
-
-    cel = bruto.get(f"{p}_celular", "")
-    d[f"{p}_celular"] = _celular(cel) or ""
-    if cel.strip() and not d[f"{p}_celular"]:
-        avisos.append(f"Celular do {rotulo} inválido (não importado)")
-
-    cep = bruto.get(f"{p}_cep", "")
-    d[f"{p}_cep"] = _cep(cep) or ""
-    if cep.strip() and not d[f"{p}_cep"]:
-        avisos.append(f"CEP do {rotulo} inválido (não importado)")
-
-    nasc, prob = _data(bruto.get(f"{p}_data_nascimento", ""))
-    d[f"{p}_data_nascimento"] = nasc.isoformat() if nasc else ""
-    if prob:
-        avisos.append(f"Data de nascimento do {rotulo} inválida (não importada)")
-
-    d[f"{p}_endereco"] = (bruto.get(f"{p}_endereco") or "").strip()[:255]
-    d[f"{p}_bairro"] = (bruto.get(f"{p}_bairro") or "").strip()[:255]
+def _cpf(texto):
+    """Devolve só os 11 dígitos do CPF se for válido; None se inválido. Em branco devolve ""."""
+    d = re.sub(r"\D", "", texto or "")
+    if not d:
+        return ""
+    if len(d) != 11 or d == d[0] * 11:
+        return None
+    for tamanho in (9, 10):
+        soma = sum(int(n) * p for n, p in zip(d[:tamanho], range(tamanho + 1, 1, -1)))
+        digito = (soma * 10 % 11) % 10
+        if digito != int(d[tamanho]):
+            return None
     return d
+
+
+def _unidade(texto):
+    """Devolve o valor válido de Aluno.Unidade para o texto informado, ou "" se não reconhecer.
+
+    Aceita tanto o valor gravado no banco quanto o rótulo, sem diferenciar acento/maiúscula.
+    """
+    texto = (texto or "").strip()
+    if not texto:
+        return ""
+    mapa = {sem_acento(v).upper(): v for v in Aluno.Unidade.values}
+    mapa.update({sem_acento(rotulo).upper(): v for v, rotulo in Aluno.Unidade.choices})
+    return mapa.get(sem_acento(texto).upper(), "")
 
 
 def validar_campos(bruto):
@@ -261,23 +238,25 @@ def validar_campos(bruto):
         erros.append(f"Data de nascimento inválida: {problema}")
     d["data_nascimento"] = nasc.isoformat() if nasc else ""
 
-    for campo, rotulo in (("ra", "R.A."), ("matricula", "Matrícula")):
+    for campo, rotulo in (("ra", "R.A."),):
         v = _codigo(bruto.get(campo, ""))
         if v and not re.fullmatch(r"[A-Za-z0-9._-]{1,50}", v):
             erros.append(f"{rotulo} inválido (use só letras, números, ponto, hífen; até 50 caracteres)")
             v = ""
         d[campo] = v
 
-    cpf, problema = _cpf(bruto.get("cpf", ""))
-    if problema:
-        erros.append(f"CPF do aluno inválido: {problema}")
-    d["cpf"] = cpf
+    # CPF é opcional: inválido vira aviso e o aluno entra sem CPF
+    cpf_txt = (bruto.get("cpf") or "").strip()
+    cpf = _cpf(cpf_txt)
+    d["cpf"] = cpf or ""
+    if cpf_txt and cpf is None:
+        avisos.append("CPF do aluno inválido (não importado)")
 
-    unidades = {chave_nome(valor): valor for valor, _ in Aluno.Unidade.choices}
-    un = chave_nome(bruto.get("unidade", ""))
-    d["unidade"] = unidades.get(un, "")
-    if un and not d["unidade"]:
-        erros.append("Unidade inválida (use Centro ou Chiara)")
+    # unidade é opcional: em branco ou não reconhecida = aluno sem unidade (não rejeita a linha)
+    unidade_txt = (bruto.get("unidade") or "").strip()
+    d["unidade"] = _unidade(unidade_txt)
+    if unidade_txt and not d["unidade"]:
+        avisos.append(f'Unidade "{unidade_txt}" não reconhecida (aluno importado sem unidade)')
 
     email = (bruto.get("email") or "").strip().lower()
     if email and not _email_valido(email):
@@ -295,11 +274,39 @@ def validar_campos(bruto):
     if cep.strip() and not d["cep"]:
         avisos.append("CEP do aluno inválido (não importado)")
 
-    for campo in ("endereco", "bairro", "cidade", "serie"):
+    for campo in ("endereco", "bairro", "cidade", "serie", "responsavel_pedagogico"):
         d[campo] = (bruto.get(campo) or "").strip()[: 50 if campo == "serie" else 255]
 
-    d.update(_validar_responsavel(bruto, "resp", "responsável financeiro", erros, avisos))
-    d["ped_nome"] = re.sub(r"\s+", " ", bruto.get("ped_nome", "")).strip()[:255]  # pedagógico: só o nome
+    # responsável
+    rnome = re.sub(r"\s+", " ", bruto.get("resp_nome", "")).strip()
+    d["resp_nome"] = rnome[:255]
+    outros = any(bruto.get(c, "").strip() for c in
+                 ("resp_email", "resp_celular", "resp_cep", "resp_endereco", "resp_bairro", "resp_data_nascimento"))
+    if not rnome:
+        if outros:
+            avisos.append("Dados do responsável ignorados: nome do responsável em branco")
+        for c in ("resp_email", "resp_celular", "resp_cep", "resp_endereco", "resp_bairro", "resp_data_nascimento"):
+            d[c] = ""
+    else:
+        remail = (bruto.get("resp_email") or "").strip().lower()
+        if remail and not _email_valido(remail):
+            erros.append("E-mail do responsável inválido")
+            remail = ""
+        d["resp_email"] = remail
+        rcel = bruto.get("resp_celular", "")
+        d["resp_celular"] = _celular(rcel) or ""
+        if rcel.strip() and not d["resp_celular"]:
+            avisos.append("Celular do responsável inválido (não importado)")
+        rcep = bruto.get("resp_cep", "")
+        d["resp_cep"] = _cep(rcep) or ""
+        if rcep.strip() and not d["resp_cep"]:
+            avisos.append("CEP do responsável inválido (não importado)")
+        rnasc, rprob = _data(bruto.get("resp_data_nascimento", ""))
+        d["resp_data_nascimento"] = rnasc.isoformat() if rnasc else ""
+        if rprob:
+            avisos.append("Data de nascimento do responsável inválida (não importada)")
+        d["resp_endereco"] = (bruto.get("resp_endereco") or "").strip()[:255]
+        d["resp_bairro"] = (bruto.get("resp_bairro") or "").strip()[:255]
     return d, erros, avisos
 
 
@@ -307,38 +314,46 @@ def validar_campos(bruto):
 def analisar(conteudo, atualizar_existentes):
     linhas, ignoradas = ler_csv(conteudo)
 
-    existentes = list(Aluno.objects.values("id", "nome", "ra", "cpf", "matricula", "data_nascimento"))
+    existentes = list(Aluno.objects.values("id", "nome", "ra", "cpf", "data_nascimento"))
     por_ra = {a["ra"]: a for a in existentes if a["ra"]}
-    por_cpf = {a["cpf"]: a for a in existentes if a["cpf"]}
-    por_matricula = {a["matricula"]: a for a in existentes if a["matricula"]}
+    por_cpf = {re.sub(r"\D", "", a["cpf"]): a for a in existentes if a["cpf"]}
     por_nome_nasc = {}
     for a in existentes:
         por_nome_nasc.setdefault((chave_nome(a["nome"]), a["data_nascimento"]), []).append(a)
 
-    vistos_ra, vistos_cpf, vistos_matricula, vistos_nome_nasc = {}, {}, {}, {}
+    orientadores = {}
+    for u in get_user_model().objects.filter(perfil="orientador", is_active=True):
+        orientadores[u.email.lower()] = u.pk
+        orientadores[chave_nome(u.get_full_name() or u.username)] = u.pk
+        orientadores[chave_nome(u.username)] = u.pk
+
+    vistos_ra, vistos_nome_nasc, vistos_cpf = {}, {}, {}
     resultado = []
     for numero, bruto in linhas:
         d, erros, avisos = validar_campos(bruto)
         acao, aluno_id = "criar", None
 
+        d["responsavel_pedagogico_id"] = None
+        if d["responsavel_pedagogico"]:
+            achado = orientadores.get(d["responsavel_pedagogico"].lower()) or orientadores.get(chave_nome(d["responsavel_pedagogico"]))
+            if achado:
+                d["responsavel_pedagogico_id"] = achado
+            else:
+                avisos.append("Responsável pedagógico não encontrado entre os usuários com perfil orientador (aluno importado sem ele)")
+
         if d["nome"] and d["data_nascimento"]:
             nasc = date.fromisoformat(d["data_nascimento"])
             chave = (chave_nome(d["nome"]), nasc)
-            ra, cpf, matricula = d["ra"], d["cpf"], d["matricula"]
+            ra = d["ra"]
 
             # duplicidade dentro do próprio arquivo
             if ra and ra in vistos_ra:
                 erros.append(f"R.A. repetido no arquivo (já aparece na linha {vistos_ra[ra]})")
-            if cpf and cpf in vistos_cpf:
-                erros.append(f"CPF repetido no arquivo (já aparece na linha {vistos_cpf[cpf]})")
-            if matricula and matricula in vistos_matricula:
-                erros.append(f"Matrícula repetida no arquivo (já aparece na linha {vistos_matricula[matricula]})")
             if chave in vistos_nome_nasc:
                 erros.append(f"Aluno duplicado no arquivo (mesmo nome e data de nascimento da linha {vistos_nome_nasc[chave]})")
 
             # duplicidade contra o banco
             alvo = None
-            motivo_dup = ""
             if ra and ra in por_ra:
                 alvo = por_ra[ra]
                 if chave_nome(alvo["nome"]) != chave_nome(d["nome"]):
@@ -346,13 +361,6 @@ def analisar(conteudo, atualizar_existentes):
                     alvo = None
                 else:
                     motivo_dup = f"Aluno já cadastrado com este R.A. (nº {alvo['id']})"
-            elif cpf and cpf in por_cpf:
-                alvo = por_cpf[cpf]
-                if chave_nome(alvo["nome"]) != chave_nome(d["nome"]):
-                    erros.append(f"CPF já cadastrado para outro nome (aluno nº {alvo['id']})")
-                    alvo = None
-                else:
-                    motivo_dup = f"Aluno já cadastrado com este CPF (nº {alvo['id']})"
             else:
                 candidatos = por_nome_nasc.get(chave, [])
                 if candidatos:
@@ -364,26 +372,26 @@ def analisar(conteudo, atualizar_existentes):
                     else:
                         alvo = c
                         motivo_dup = f"Aluno já cadastrado (mesmo nome e data de nascimento, nº {c['id']})"
+            # CPF repetido no arquivo ou já pertencente a outro aluno
+            cpf = d["cpf"]
+            if cpf:
+                if cpf in vistos_cpf:
+                    erros.append(f"CPF repetido no arquivo (já aparece na linha {vistos_cpf[cpf]})")
+                dono = por_cpf.get(cpf)
+                if dono and (alvo is None or dono["id"] != alvo["id"]):
+                    erros.append(f"CPF já cadastrado para outro aluno (nº {dono['id']})")
+
             if alvo and not erros:
                 if atualizar_existentes:
                     acao, aluno_id = "atualizar", alvo["id"]
                 else:
-                    erros.append(motivo_dup + '. Marque "Atualizar alunos já cadastrados" para alterá-lo')
-
-            # a coluna "Unidade" é opcional no arquivo; se faltar, a unidade é definida na prévia
-
-            if matricula and matricula in por_matricula and (aluno_id != por_matricula[matricula]["id"]):
-                erros.append(f"Matrícula já usada por outro aluno (nº {por_matricula[matricula]['id']})")
-            if cpf and cpf in por_cpf and (aluno_id != por_cpf[cpf]["id"]):
-                erros.append(f"CPF já usado por outro aluno (nº {por_cpf[cpf]['id']})")
+                    erros.append(motivo_dup + ". Marque \"Atualizar alunos já cadastrados\" para alterá-lo")
 
             if not erros:  # só linhas boas "reservam" o valor para detectar repetidos depois
                 if ra:
                     vistos_ra[ra] = numero
-                if cpf:
-                    vistos_cpf[cpf] = numero
-                if matricula:
-                    vistos_matricula[matricula] = numero
+                if d["cpf"]:
+                    vistos_cpf[d["cpf"]] = numero
                 vistos_nome_nasc[chave] = numero
 
         resultado.append({
@@ -394,18 +402,27 @@ def analisar(conteudo, atualizar_existentes):
 
 
 @transaction.atomic
-def criar_previa(usuario, nome_arquivo, conteudo, atualizar_existentes, unidade=""):
-    # "unidade" é só para compatibilidade com chamadas antigas: a unidade de cada aluno vem do arquivo.
+def criar_previa(usuario, nome_arquivo, conteudo, atualizar_existentes=False, unidade=""):
+    """Cria a prévia. `unidade` (opcional) é só o PADRÃO das linhas que vierem sem unidade no CSV."""
+    unidade = unidade or ""
     resultado, ignoradas = analisar(conteudo, atualizar_existentes)
     imp = Importacao.objects.create(
-        usuario=usuario, arquivo_nome=nome_arquivo[:255], unidade=unidade or "",
+        usuario=usuario, arquivo_nome=nome_arquivo[:255], unidade=unidade,
         atualizar_existentes=atualizar_existentes, colunas_ignoradas=", ".join(ignoradas),
         total_linhas=len(resultado),
     )
     novas = []
     for r in resultado:
         com_erro = bool(r["erros"])
-        dados = {} if com_erro else {**r["dados"], "_acao": r["acao"], "_aluno_id": r["aluno_id"]}
+        if com_erro:
+            dados = {}
+        else:
+            dados = {
+                **r["dados"],
+                "unidade": r["dados"].get("unidade") or unidade,
+                "_acao": r["acao"],
+                "_aluno_id": r["aluno_id"],
+            }
         novas.append(ImportacaoLinha(
             importacao=imp, numero_linha=r["numero"], nome=r["nome"][:255], ra=r["ra"][:50],
             situacao=ImportacaoLinha.Situacao.ERRO if com_erro else ImportacaoLinha.Situacao.VALIDA,
@@ -431,27 +448,23 @@ def _auditoria(kwargs, usuario, criando):
         kwargs["updated_by"] = usuario
 
 
-def _obter_responsavel(d, usuario, p="resp"):
-    """Acha (ou cria) o responsável na tabela de responsáveis. p = 'resp' (financeiro) ou 'ped' (pedagógico)."""
-    nome = d.get(f"{p}_nome")
-    if not nome:
+def _obter_responsavel(d, usuario):
+    if not d.get("resp_nome"):
         return None
-    email = d.get(f"{p}_email")
-    celular = d.get(f"{p}_celular")
-    qs = Responsavel.objects.filter(nome__iexact=nome)
-    if email:
-        qs = qs.filter(email__iexact=email)
-    elif celular:
-        qs = qs.filter(celular=celular)
+    qs = Responsavel.objects.filter(nome__iexact=d["resp_nome"])
+    if d.get("resp_email"):
+        qs = qs.filter(email__iexact=d["resp_email"])
+    elif d.get("resp_celular"):
+        qs = qs.filter(celular=d["resp_celular"])
     existente = qs.first()
     if existente:
         return existente
-    nasc = d.get(f"{p}_data_nascimento")
     dados = dict(
-        nome=nome, email=_vazio_para_none(email), celular=_vazio_para_none(celular),
-        data_nascimento=date.fromisoformat(nasc) if nasc else None,
-        endereco=_vazio_para_none(d.get(f"{p}_endereco")), bairro=_vazio_para_none(d.get(f"{p}_bairro")),
-        cep=_vazio_para_none(d.get(f"{p}_cep")),
+        nome=d["resp_nome"], email=_vazio_para_none(d["resp_email"]),
+        celular=_vazio_para_none(d["resp_celular"]),
+        data_nascimento=date.fromisoformat(d["resp_data_nascimento"]) if d.get("resp_data_nascimento") else None,
+        endereco=_vazio_para_none(d["resp_endereco"]), bairro=_vazio_para_none(d["resp_bairro"]),
+        cep=_vazio_para_none(d["resp_cep"]),
     )
     campos = {f.name for f in Responsavel._meta.get_fields()}
     if "created_by" in campos:
@@ -460,12 +473,10 @@ def _obter_responsavel(d, usuario, p="resp"):
 
 
 def _gravar(d, importacao, usuario):
-    responsavel = _obter_responsavel(d, usuario, "resp")
-    pedagogico = _obter_responsavel(d, usuario, "ped")
+    responsavel = _obter_responsavel(d, usuario)
     campos = {
         "nome": d["nome"], "data_nascimento": date.fromisoformat(d["data_nascimento"]),
-        "ra": d["ra"], "cpf": d.get("cpf", ""), "matricula": d["matricula"],
-        "unidade": d.get("unidade", ""), "celular": d["celular"], "email": d["email"],
+        "ra": d["ra"], "cpf": d.get("cpf", ""), "celular": d["celular"], "email": d["email"],
         "endereco": d["endereco"], "bairro": d["bairro"], "cidade": d["cidade"],
         "cep": d["cep"], "serie": d["serie"],
     }
@@ -474,10 +485,12 @@ def _gravar(d, importacao, usuario):
         for chave, valor in campos.items():
             if valor not in ("", None):
                 setattr(aluno, chave, valor)
+        if d.get("unidade"):  # só troca a unidade se veio uma
+            aluno.unidade = d["unidade"]
         if responsavel:
             aluno.responsavel = responsavel
-        if pedagogico:
-            aluno.responsavel_pedagogico = pedagogico
+        if d.get("responsavel_pedagogico_id"):
+            aluno.responsavel_pedagogico_id = d["responsavel_pedagogico_id"]
         extra = {}
         _auditoria(extra, usuario, criando=False)
         for chave, valor in extra.items():
@@ -487,7 +500,8 @@ def _gravar(d, importacao, usuario):
     extra = {}
     _auditoria(extra, usuario, criando=True)
     aluno = Aluno(
-        responsavel=responsavel, responsavel_pedagogico=pedagogico,
+        unidade=d.get("unidade") or importacao.unidade or "",
+        responsavel=responsavel, responsavel_pedagogico_id=d.get("responsavel_pedagogico_id"),
         **{k: _vazio_para_none(v) for k, v in campos.items()}, **extra,
     )
     aluno.save()
@@ -505,13 +519,6 @@ def confirmar(importacao, usuario):
     S = ImportacaoLinha.Situacao
     criados = atualizados = falhas = 0
     for linha in importacao.linhas.filter(situacao=S.VALIDA).order_by("numero_linha"):
-        if linha.dados.get("_acao") == "criar" and not linha.dados.get("unidade"):
-            linha.situacao = S.REJEITADO
-            linha.motivo = "Unidade não definida para este aluno novo."
-            linha.dados = {}
-            linha.save(update_fields=["situacao", "motivo", "dados"])
-            falhas += 1
-            continue
         try:
             with transaction.atomic():
                 aluno, criado = _gravar(linha.dados, importacao, usuario)
@@ -548,11 +555,10 @@ def cancelar(importacao):
 
 
 MODELO_CSV = (
-    "Aluno;Data de nascimento;RA;CPF;Unidade;Série;Matrícula;Celular;Email;Endereço;Bairro;Cidade;CEP;"
-    "Responsável financeiro;Email do responsável financeiro;Celular do responsável financeiro;"
-    "Data de nascimento do responsável financeiro;CEP do responsável financeiro;"
-    "Endereço do responsável financeiro;Bairro do responsável financeiro;Responsável pedagógico\r\n"
-    "Maria Exemplo da Silva;15/03/2012;2026010001;529.982.247-25;Centro;6º Ano EF;123456;79999990000;"
-    "maria@exemplo.com;Rua Exemplo 100;Centro;Itabaiana;49500-000;José Exemplo da Silva;jose@exemplo.com;"
-    "79988880000;20/08/1980;49500-000;Rua Exemplo 100;Centro;Ana Exemplo Pedagoga\r\n"
+    "Aluno;Data de nascimento;RA;Série;Responsável pedagógico;Celular;Email;Endereço;Bairro;Cidade;CEP;"
+    "Responsável financeiro;Email do responsável;Celular do responsável;"
+    "Data de nascimento do responsável;CEP do responsável;Endereço do responsável;Bairro do responsável\r\n"
+    "Maria Exemplo da Silva;15/03/2012;2026010001;6º Ano EF;orientador@exemplo.com;79999990000;maria@exemplo.com;"
+    "Rua Exemplo 100;Centro;Itabaiana;49500-000;José Exemplo da Silva;jose@exemplo.com;79988880000;"
+    "20/08/1980;49500-000;Rua Exemplo 100;Centro\r\n"
 )

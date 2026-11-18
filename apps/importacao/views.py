@@ -54,7 +54,7 @@ def atualizar_totais(imp):
 
 
 def alunos_novos_sem_unidade(imp):
-    """Linhas válidas que vão CADASTRAR um aluno e ainda não têm unidade."""
+    """Linhas válidas que vão CADASTRAR um aluno e ainda não têm unidade (informativo: unidade é opcional)."""
     return [
         l for l in imp.linhas.filter(situacao=S.VALIDA)
         if l.dados.get("_acao") == "criar" and not l.dados.get("unidade")
@@ -77,9 +77,10 @@ def validar_edicao(imp, linha, bruto):
         if qs.exists():
             erros.append("Este R.A. já está cadastrado para outro aluno.")
 
-    # CPF já pertence a outro aluno?
-    if dados["cpf"]:
-        qs = Aluno.objects.filter(cpf=dados["cpf"])
+    # CPF (opcional: validar_campos não o devolve, então vem do que já estava guardado)
+    cpf = dados.get("cpf") or bruto.get("cpf", "")
+    if cpf:
+        qs = Aluno.objects.filter(cpf=cpf)
         if aluno_id:
             qs = qs.exclude(pk=aluno_id)
         if qs.exists():
@@ -91,7 +92,7 @@ def validar_edicao(imp, linha, bruto):
         outro = outra.dados
         if dados["ra"] and dados["ra"] == outro.get("ra"):
             erros.append("Este R.A. já aparece em outro aluno desta importação.")
-        if dados["cpf"] and dados["cpf"] == outro.get("cpf"):
+        if cpf and cpf == outro.get("cpf"):
             erros.append("Este CPF já aparece em outro aluno desta importação.")
         if (
             dados["nome"].strip().upper() == outro.get("nome", "").strip().upper()
@@ -102,6 +103,9 @@ def validar_edicao(imp, linha, bruto):
     if erros:
         return None, list(dict.fromkeys(erros))
 
+    # validar_campos já devolve "unidade" (opcional). Aqui voltam os campos internos
+    # que ele não gera, para a edição não apagar o orientador nem a ação da linha.
+    dados["responsavel_pedagogico_id"] = linha.dados.get("responsavel_pedagogico_id")
     dados["_acao"] = linha.dados.get("_acao", "criar")
     dados["_aluno_id"] = aluno_id
     return {"dados": dados, "avisos": avisos}, []
@@ -118,6 +122,7 @@ def importar(request):
                 nome_arquivo=arquivo.name,
                 conteudo=arquivo.read(),
                 atualizar_existentes=form.cleaned_data["atualizar_existentes"],
+                unidade=form.cleaned_data.get("unidade", ""),  # opcional: padrão das linhas sem unidade
             )
         except services.ArquivoInvalido as exc:
             form.add_error("arquivo", str(exc))
@@ -142,7 +147,7 @@ def previa(request, pk):
             messages.info(request, "Importação cancelada. Nenhum aluno foi cadastrado.")
             return redirect("importacao:importar")
 
-        # DEFINIR A UNIDADE DOS ALUNOS NOVOS QUE ESTÃO SEM UNIDADE
+        # DEFINIR A UNIDADE DOS ALUNOS NOVOS QUE ESTÃO SEM UNIDADE (opcional)
         if acao == "definir_unidade":
             unidade = request.POST.get("unidade", "")
             if unidade not in Aluno.Unidade.values:
@@ -188,18 +193,10 @@ def previa(request, pk):
             messages.success(request, f"Dados de {linha.nome} atualizados na prévia.")
             return redirect("importacao:previa", pk=imp.pk)
 
-        # CONFIRMAR IMPORTAÇÃO
+        # CONFIRMAR IMPORTAÇÃO (unidade é opcional: não bloqueia mais)
         if acao == "confirmar":
             if not imp.linhas.filter(situacao=S.VALIDA).exists():
                 messages.error(request, "Não existem alunos válidos para importar.")
-                return redirect("importacao:previa", pk=imp.pk)
-
-            faltando = len(alunos_novos_sem_unidade(imp))
-            if faltando:
-                messages.error(
-                    request,
-                    f"{faltando} aluno(s) novo(s) estão sem unidade. Defina a unidade antes de confirmar.",
-                )
                 return redirect("importacao:previa", pk=imp.pk)
 
             services.confirmar(imp, request.user)

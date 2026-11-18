@@ -1,7 +1,8 @@
-
 from datetime import date
 
+from django.conf import settings
 from django.db import models
+
 from .validators import validar_cpf
 
 
@@ -28,15 +29,12 @@ class Aluno(models.Model):
         CHIARA = "Chiara", "Chiara"
 
     nome = models.CharField(max_length=255)
-    matricula = models.CharField(
-        max_length=50, unique=True, null=True, blank=True
-    )
     ra = models.CharField(
         "Registro do aluno (RA)",
         max_length=50,
         unique=True,
         null=True,
-        blank=True
+        blank=True,
     )
     serie = models.CharField(max_length=50, null=True, blank=True)
 
@@ -63,6 +61,7 @@ class Aluno(models.Model):
         choices=Unidade.choices
     )
 
+    # Responsável da família: pai, mãe, avós ou outro
     responsavel = models.ForeignKey(
         Responsavel,
         on_delete=models.SET_NULL,
@@ -71,12 +70,16 @@ class Aluno(models.Model):
         related_name="alunos"
     )
 
+    # Responsável pedagógico = o orientador do aluno: usuário do sistema com perfil
+    # "orientador". Não confundir com `responsavel` acima (pai, mãe, avós...).
     responsavel_pedagogico = models.ForeignKey(
-        Responsavel,
+        settings.AUTH_USER_MODEL,
+        verbose_name="Responsável pedagógico",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="alunos_pedagogico",
+        limit_choices_to={"perfil": "orientador", "is_active": True},
     )
 
     class Meta:

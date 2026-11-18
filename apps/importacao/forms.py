@@ -7,6 +7,13 @@ from .services import TAMANHO_MAXIMO
 
 class UploadCSVForm(forms.Form):
     arquivo = forms.FileField(label="Arquivo CSV")
+    unidade = forms.ChoiceField(
+        required=False,
+        label="Unidade padrão (opcional)",
+        choices=[("", "— Sem unidade padrão —")] + list(Aluno.Unidade.choices),
+        help_text="Usada só para os alunos que vierem sem unidade no arquivo. "
+        "Se deixar em branco, eles são cadastrados sem unidade.",
+    )
     atualizar_existentes = forms.BooleanField(
         required=False,
         label="Atualizar alunos que já estão cadastrados",
