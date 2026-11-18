@@ -49,6 +49,10 @@ INSTALLED_APPS = [
     'apps.importacao',
 ]
 
+# Encerra a sessão após 1 hora sem usar o sistema
+SESSION_COOKIE_AGE = 60 * 60          # 1 hora
+SESSION_SAVE_EVERY_REQUEST = True     # cada clique/página renova o prazo
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

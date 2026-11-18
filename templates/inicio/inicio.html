@@ -1,13 +1,161 @@
 {% extends "base.html" %}
 {% block titulo %}Início · Sistema Pedagógico{% endblock %}
-{% block main_classe %}cheio{% endblock %}
 {% block conteudo %}
-<section class="ml-hero tela-cheia">
-  <div class="texto">
-    <div class="eyebrow">Bem-vindo(a) ao</div>
-    <h1>Sistema Pedagógico</h1>
-    <p>Colégio Monteiro Lobato</p>
-  </div>
-  <div class="foto" role="img" aria-label="Fachada do Colégio Monteiro Lobato"></div>
-</section>
+<style>
+  .ini { display: grid; gap: 20px; grid-template-columns: 1fr; --vinho: #8b0a1a; --vinho-escuro: #6d0714; --rosa: #fbe6e8; }
+  @media (min-width: 992px) { .ini { grid-template-columns: 1.55fr 1fr; } }
+  .ini-card { min-width: 0; background: #fff; border-radius: 22px; padding: 22px 24px; box-shadow: 0 2px 14px rgba(139, 10, 26, .07); }
+  .ini-card h2 { margin: 0; font-size: 1.15rem; color: var(--vinho); }
+  .ini-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+
+  .ini-hero { background: linear-gradient(120deg, #fff 35%, var(--rosa) 100%); border-radius: 22px; padding: 44px 40px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 14px rgba(139, 10, 26, .07); }
+  .ini-hero__pre { margin: 0; font-size: 1.6rem; color: #4a4a5a; }
+  .ini-hero h1 { margin: 0 0 12px; font-size: 2.6rem; line-height: 1.1; color: var(--vinho); }
+  .ini-hero p { margin: 0; max-width: 28rem; font-size: 1.1rem; color: #4a4a5a; }
+  .ini-hero__linha { display: block; width: 90px; height: 4px; margin-top: 22px; border-radius: 4px; background: var(--vinho); }
+
+  .ini-cal__nav { display: flex; align-items: center; gap: 8px; }
+  .ini-cal__nav a { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--vinho); text-decoration: none; font-size: 1.3rem; }
+  .ini-cal__nav a:hover { background: var(--rosa); }
+  .ini-cal__mes { background: var(--rosa); color: var(--vinho); border-radius: 999px; padding: 6px 16px; font-weight: 600; }
+  .ini-cal table { width: 100%; border-collapse: collapse; text-align: center; }
+  .ini-cal th { padding: 6px 0 10px; font-weight: 600; color: #555; font-size: .95rem; }
+  .ini-cal td { padding: 3px 0; }
+  .ini-cal td span { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; font-weight: 600; color: #222; }
+  .ini-cal td.fora span { color: #b9b9c2; font-weight: 400; }
+  .ini-cal td.aniversario span { background: var(--rosa); color: var(--vinho); }
+  .ini-cal td.hoje span { background: var(--vinho); color: #fff; }
+
+  .ini-lista { list-style: none; margin: 0; padding: 0; }
+  .ini-lista li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid #f0e4e5; }
+  .ini-lista li:first-child { border-top: 0; }
+  .ini-lista small { color: #8a8a96; white-space: nowrap; }
+  .ini-vazio { margin: 0; color: #8a8a96; }
+
+  /* aniversariantes: uma fila só, rolável (arrastar, setas, trackpad ou celular) */
+  .ini-carrossel { position: relative; }
+  .ini-anivs { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; scroll-snap-type: x proximity; cursor: grab; scrollbar-width: thin; scrollbar-color: #d9a3a9 transparent; }
+  .ini-anivs.arrastando { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+  .ini-aniv { flex: 0 0 190px; scroll-snap-align: start; background: var(--rosa); border-radius: 16px; padding: 12px 14px; }
+  .ini-aniv strong { display: block; color: var(--vinho-escuro); }
+  .ini-aniv span { display: block; font-size: .9rem; color: #555; }
+  .ini-aniv em { display: block; margin-top: 4px; font-style: normal; font-size: .85rem; color: var(--vinho); font-weight: 600; }
+  .ini-seta { position: absolute; top: calc(50% - 15px); width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fff; color: var(--vinho); font-size: 1.5rem; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(139, 10, 26, .25); display: grid; place-items: center; transition: opacity .15s; }
+  .ini-seta:hover { background: var(--rosa); }
+  .ini-seta--voltar { left: -10px; }
+  .ini-seta--avancar { right: -10px; }
+  .ini-seta[hidden] { display: none; }
+</style>
+
+<div class="ini">
+  <section class="ini-hero">
+    <p class="ini-hero__pre">Bem-vindos ao</p>
+    <h1>Sistema Pedagógico!</h1>
+    <p>Seu espaço para gerenciar informações com praticidade e eficiência.</p>
+    <span class="ini-hero__linha"></span>
+  </section>
+
+  <section class="ini-card ini-cal">
+    <div class="ini-topo">
+      <h2>Calendário</h2>
+      <div class="ini-cal__nav">
+        <a href="?mes={{ calendario.mes_anterior }}" aria-label="Mês anterior">&#8249;</a>
+        <a href="?mes={{ calendario.mes_seguinte }}" aria-label="Próximo mês">&#8250;</a>
+        <span class="ini-cal__mes">{{ calendario.titulo_mes }}</span>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>{% for d in calendario.dias_semana %}<th>{{ d }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for semana in calendario.semanas %}
+        <tr>
+          {% for c in semana %}
+          <td class="{% if c.fora %}fora{% endif %} {% if c.hoje %}hoje{% elif c.aniversario %}aniversario{% endif %}"
+              {% if c.aniversario %}title="Aniversário de aluno"{% endif %}>
+            <span>{{ c.dia }}</span>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="ini-card">
+    <div class="ini-topo"><h2>Atividades Recentes</h2></div>
+    {% if atividades %}
+    <ul class="ini-lista">
+      {% for a in atividades %}
+      <li>
+        <span>{{ a.texto }}</span>
+        {% if a.quando %}<small>{{ a.quando|date:"d/m, H:i" }}</small>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="ini-vazio">Nenhuma atividade recente.</p>
+    {% endif %}
+  </section>
+
+  <section class="ini-card">
+    <div class="ini-topo"><h2>Aniversariantes da Semana</h2></div>
+    {% if aniversariantes %}
+    <div class="ini-carrossel">
+      <button type="button" class="ini-seta ini-seta--voltar" aria-label="Anteriores" hidden>&#8249;</button>
+      <div class="ini-anivs">
+        {% for a in aniversariantes %}
+        <div class="ini-aniv">
+          <strong>{{ a.nome }}</strong>
+          <span>{{ a.rotulo }}</span>
+          <em>{{ a.idade }} anos</em>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="ini-seta ini-seta--avancar" aria-label="Próximos" hidden>&#8250;</button>
+    </div>
+    {% else %}
+    <p class="ini-vazio">Nenhum aniversariante nos próximos 7 dias.</p>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+(function () {
+  var faixa = document.querySelector(".ini-anivs");
+  if (!faixa) return;
+  var voltar = document.querySelector(".ini-seta--voltar");
+  var avancar = document.querySelector(".ini-seta--avancar");
+
+  // setas: só aparecem quando há para onde rolar
+  function atualizarSetas() {
+    var max = faixa.scrollWidth - faixa.clientWidth;
+    voltar.hidden = faixa.scrollLeft <= 4;
+    avancar.hidden = max <= 4 || faixa.scrollLeft >= max - 4;
+  }
+  function rolar(sentido) {
+    faixa.scrollBy({ left: sentido * Math.max(faixa.clientWidth * 0.8, 200), behavior: "smooth" });
+  }
+  voltar.addEventListener("click", function () { rolar(-1); });
+  avancar.addEventListener("click", function () { rolar(1); });
+  faixa.addEventListener("scroll", atualizarSetas);
+  window.addEventListener("resize", atualizarSetas);
+  atualizarSetas();
+
+  // arrastar com o mouse
+  var baixo = false, x0 = 0, rolagem0 = 0;
+  faixa.addEventListener("mousedown", function (e) {
+    baixo = true; x0 = e.pageX; rolagem0 = faixa.scrollLeft; faixa.classList.add("arrastando");
+  });
+  window.addEventListener("mouseup", function () {
+    baixo = false; faixa.classList.remove("arrastando");
+  });
+  faixa.addEventListener("mousemove", function (e) {
+    if (!baixo) return;
+    e.preventDefault();
+    faixa.scrollLeft = rolagem0 - (e.pageX - x0);
+  });
+})();
+</script>
 {% endblock %}

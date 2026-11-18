@@ -15,8 +15,36 @@ def _estilizar(form):
         campo.widget.attrs.setdefault("class", css)
 
 
+def _campo_extras():
+    return forms.MultipleChoiceField(
+        label="Liberar mais alguma funcionalidade para este usuário?",
+        required=False,
+        choices=list(Usuario.FUNCIONALIDADES.items()),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        help_text="As funcionalidades que o perfil já inclui aparecem marcadas e bloqueadas. "
+        "As demais só valem para este usuário.",
+    )
+
+
+def _base_por_perfil():
+    """{perfil: [funcionalidades já incluídas]} — usado na tela para marcar/bloquear ao trocar o perfil."""
+    return {
+        perfil.value: sorted(c for c in Usuario.FUNCIONALIDADES_DO_PERFIL.get(perfil, set()) if c in Usuario.FUNCIONALIDADES)
+        for perfil in Usuario.Perfil
+    }
+
+
+def _extras_efetivos(perfil, escolhidas):
+    """Guarda só o que o perfil NÃO inclui (o resto seria redundante e sumiria ao trocar de perfil)."""
+    base = Usuario.FUNCIONALIDADES_DO_PERFIL.get(perfil, set())
+    escolhidas = set(escolhidas or [])
+    return [c for c in Usuario.FUNCIONALIDADES if c in escolhidas and c not in base]
+
+
 class UsuarioCriarForm(BaseUserCreationForm):
     """Cadastro feito pelo administrador, com senha inicial."""
+
+    permissoes_extras = _campo_extras()
 
     class Meta:
         model = Usuario
@@ -27,6 +55,7 @@ class UsuarioCriarForm(BaseUserCreationForm):
         self.fields["first_name"].required = True
         self.fields["last_name"].required = True
         self.fields["username"].help_text = "Usado para entrar no sistema. Sem espaços."
+        self.base_por_perfil = _base_por_perfil()
         _estilizar(self)
 
     def clean_email(self):
@@ -35,6 +64,15 @@ class UsuarioCriarForm(BaseUserCreationForm):
             raise forms.ValidationError("Já existe um usuário com este e-mail.")
         return email
 
+    def save(self, commit=True):
+        usuario = super().save(commit=False)
+        usuario.permissoes_extras = _extras_efetivos(usuario.perfil, self.cleaned_data.get("permissoes_extras"))
+        if commit:
+            usuario.save()
+            if hasattr(self, "save_m2m"):
+                self.save_m2m()
+        return usuario
+
 
 class UsuarioEditarForm(forms.ModelForm):
     nova_senha = forms.CharField(
@@ -42,6 +80,7 @@ class UsuarioEditarForm(forms.ModelForm):
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
         help_text="Deixe em branco para manter a senha atual.",
     )
+    permissoes_extras = _campo_extras()
 
     class Meta:
         model = Usuario
@@ -52,6 +91,8 @@ class UsuarioEditarForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["first_name"].required = True
         self.fields["last_name"].required = True
+        self.initial["permissoes_extras"] = list(self.instance.permissoes_extras or [])
+        self.base_por_perfil = _base_por_perfil()
         _estilizar(self)
         # O administrador não pode tirar o próprio acesso nem mudar o próprio perfil (evita se trancar fora).
         if usuario_logado is not None and usuario_logado.pk == self.instance.pk:
@@ -78,6 +119,7 @@ class UsuarioEditarForm(forms.ModelForm):
         usuario = super().save(commit=False)
         if self.cleaned_data.get("nova_senha"):
             usuario.set_password(self.cleaned_data["nova_senha"])
+        usuario.permissoes_extras = _extras_efetivos(usuario.perfil, self.cleaned_data.get("permissoes_extras"))
         if commit:
             usuario.save()
         return usuario
