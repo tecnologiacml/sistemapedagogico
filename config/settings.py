@@ -45,8 +45,13 @@ INSTALLED_APPS = [
     # Apps do projeto
     'apps.usuarios',
     'apps.alunos',
+    'apps.encontros',
     'apps.importacao',
 ]
+
+# Encerra a sessão após 1 hora sem usar o sistema
+SESSION_COOKIE_AGE = 60 * 60          # 1 hora
+SESSION_SAVE_EVERY_REQUEST = True     # cada clique/página renova o prazo
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -54,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.usuarios.middleware.TrocaSenhaObrigatoriaMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -89,6 +95,8 @@ DATABASES = {
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': os.environ['DB_HOST'],
         'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
             'sslmode': os.environ.get('DB_SSLMODE', 'require'),
             'options': '-c search_path=django,public',
@@ -102,6 +110,12 @@ import sys  # noqa: E402
 
 if 'test' in sys.argv:
     DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}
+    MIGRATION_MODULES = {
+        'usuarios': None,
+        'alunos': None,
+        'encontros': None,
+        'importacao': None,
+    }
 
 
 # Password validation

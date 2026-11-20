@@ -18,6 +18,7 @@
     <ul class="ml-nav">
       <li><a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}ativo{% endif %}"{% if request.resolver_match.url_name == 'home' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="home" %}Início</a></li>
       <li><a href="{% url 'alunos:lista' %}" class="{% if request.resolver_match.namespace == 'alunos' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'alunos' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="alunos" %}Alunos</a></li>
+      <li><a href="{% url 'encontros:lista' %}" class="{% if request.resolver_match.namespace == 'encontros' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'encontros' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="encontros" %}Encontros</a></li>
       {# Turmas, Dashboards e Relatórios: ativar quando os módulos existirem #}
       <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="turmas" %}Turmas</a></li>
       <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="grafico" %}Dashboards</a></li>
@@ -38,6 +39,7 @@
         <span class="d-none d-md-inline small">Olá, {{ user.get_full_name|default:user.username }}
           <span class="text-muted">· {{ user.get_perfil_display }}</span></span>
         <span class="ml-avatar">{{ user.username|slice:":2"|upper }}</span>
+        <a class="btn btn-link btn-sm text-decoration-none" href="{% url 'usuarios:senha' %}">Trocar senha</a>
         <form method="post" action="{% url 'logout' %}">
           {% csrf_token %}<button class="btn btn-outline-primary btn-sm">Sair</button>
         </form>

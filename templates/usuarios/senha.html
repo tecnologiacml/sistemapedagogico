@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Trocar senha · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<h1 class="h3 mb-3">{% if user.precisa_trocar_senha %}Crie a sua senha{% else %}Trocar senha{% endif %}</h1>
+{% if user.precisa_trocar_senha %}
+  <div class="alert alert-warning" role="alert">Você entrou com uma senha provisória. Crie uma senha só sua para continuar usando o sistema.</div>
+{% endif %}
+<form method="post" class="card card-body" style="max-width: 560px" novalidate>
+  {% csrf_token %}
+  {% for erro in form.non_field_errors %}<div class="alert alert-danger">{{ erro }}</div>{% endfor %}
+  {% for campo in form %}
+    <div class="mb-3">
+      <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+      {{ campo }}
+      {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+      {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+    </div>
+  {% endfor %}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Salvar nova senha</button>
+    {% if not user.precisa_trocar_senha %}<a class="btn btn-outline-secondary" href="{% url 'home' %}">Cancelar</a>{% endif %}
+  </div>
+</form>
+{% endblock %}

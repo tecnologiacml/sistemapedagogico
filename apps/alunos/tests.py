@@ -35,7 +35,10 @@ class AlunoViewsTests(TestCase):
         )
 
     def dados(self, **extra):
-        d = {"nome": "João  Souza", "cpf": "111.444.777-35", "data_nascimento": "2011-02-03"}
+        d = {
+            "nome": "João  Souza", "cpf": "111.444.777-35", "data_nascimento": "2011-02-03",
+            "unidade": "Centro", "responsavel_opcao": "nenhum",
+        }
         d.update(extra)
         return d
 
@@ -93,7 +96,10 @@ class AlunoViewsTests(TestCase):
         self.client.force_login(self.coord)
         r = self.client.post(
             reverse("alunos:editar", args=[self.aluno.pk]),
-            {"nome": "Maria S.", "cpf": CPF_OK, "data_nascimento": "2010-05-01"},
+            {
+                "nome": "Maria S.", "cpf": CPF_OK, "data_nascimento": "2010-05-01",
+                "unidade": "Centro", "responsavel_opcao": "nenhum",
+            },
         )
         self.assertRedirects(r, reverse("alunos:lista"))
 
