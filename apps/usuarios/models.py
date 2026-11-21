@@ -43,7 +43,6 @@ class Usuario(AbstractUser):
         "liberações extras", default=list, blank=True,
         help_text="Funcionalidades liberadas para este usuário além do que o perfil já inclui.",
     )
-
     precisa_trocar_senha = models.BooleanField(
         "precisa trocar a senha", default=False,
         help_text="Marcado quando o administrador define a senha: a pessoa cria a própria no primeiro acesso.",

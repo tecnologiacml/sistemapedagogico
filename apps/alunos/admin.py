@@ -11,7 +11,10 @@ class ResponsavelAdmin(admin.ModelAdmin):
 
 @admin.register(Aluno)
 class AlunoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "matricula", "ra", "unidade", "responsavel")
+    list_display = ("ra", "nome", "serie", "cpf", "responsavel_pedagogico", "unidade", "responsavel")
+
     list_filter = ("unidade",)
-    search_fields = ("nome", "matricula", "ra")
+
+    search_fields = ("nome", "cpf", "ra")
+
     autocomplete_fields = ("responsavel",)

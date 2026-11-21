@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Importar alunos · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Importar alunos</h1>
+  <div>
+    <a class="btn btn-outline-secondary" href="{% url 'importacao:historico' %}">Histórico</a>
+    <a class="btn btn-secondary" href="{% url 'alunos:lista' %}">Voltar</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for campo in form %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}
+            <div class="form-text">{{ campo.help_text }}</div>
+          {% endif %}
+          {% for erro in campo.errors %}
+            <div class="text-danger small">{{ erro }}</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+
+      <button type="submit" class="btn btn-primary">Enviar e visualizar prévia</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

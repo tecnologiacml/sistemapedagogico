@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Novo encontro · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<h1 class="h2 mb-1">Novo encontro</h1>
+<p class="text-muted mb-4">Registro de orientação com o aluno</p>
+
+<form method="post" class="enc-form" id="form-encontro" data-url-busca="{% url 'encontros:buscar_aluno' %}" novalidate>
+  {% csrf_token %}
+  {% for erro in form.non_field_errors %}<div class="alert alert-danger">{{ erro }}</div>{% endfor %}
+  {{ form.aluno }}
+
+  <section class="enc-secao">
+    <h2>Aluno</h2>
+    <div class="row g-3">
+      <div class="col-md-6 posicao-relativa">
+        <label class="form-label" for="busca-aluno">Buscar aluno ou RA</label>
+        <input class="form-control" id="busca-aluno" type="search" autocomplete="off"
+               value="{% if aluno_sel %}{{ aluno_sel.ra|default:'' }}{% endif %}" placeholder="Digite o nome ou o RA">
+        <div class="enc-resultados" id="busca-resultados" hidden></div>
+        {% for erro in form.aluno.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="aluno-nome">Nome completo</label>
+        <input class="form-control" id="aluno-nome" readonly value="{{ aluno_sel.nome|default:'' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="aluno-serie">Série</label>
+        <input class="form-control" id="aluno-serie" readonly value="{{ aluno_sel.serie|default:'' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="aluno-numero">Nº do encontro</label>
+        <input class="form-control" id="aluno-numero" readonly value="{{ numero_previsto }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="{{ form.data.id_for_label }}">Data</label>
+        {{ form.data }}
+        {% for erro in form.data.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+      </div>
+      <div class="col-md-6">
+        <span class="form-label d-block">Presença</span>
+        <div class="seg">{% for r in form.presente %}<label>{{ r.tag }}<span>{{ r.choice_label }}</span></label>{% endfor %}</div>
+      </div>
+      <div class="col-md-6" id="bloco-duracao">
+        <span class="form-label d-block">Duração</span>
+        <div class="seg">{% for r in form.duracao %}<label>{{ r.tag }}<span>{{ r.choice_label }}</span></label>{% endfor %}</div>
+        {% for erro in form.duracao.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="enc-secao">
+    <h2>Conversa</h2>
+    <span class="form-label d-block">Combinados do encontro anterior</span>
+    <div class="seg mb-1" id="seg-combinados">
+      {% for r in form.combinados_anteriores %}
+        <label data-valor="{{ r.data.value }}">{{ r.tag }}<span>{{ r.choice_label }}</span></label>
+      {% endfor %}
+    </div>
+    {% for erro in form.combinados_anteriores.errors %}<div class="text-danger small mb-2">{{ erro }}</div>{% endfor %}
+
+    <span class="form-label d-block mt-3">Temas tratados</span>
+    <div class="chips">{% for c in form.temas %}<label>{{ c.tag }}<span>{{ c.choice_label }}</span></label>{% endfor %}</div>
+
+    <label class="form-label mt-3" for="{{ form.combinados_proximo.id_for_label }}">Combinados para o próximo encontro</label>
+    {{ form.combinados_proximo }}
+    <div class="form-text" id="ultimo-combinado" hidden></div>
+  </section>
+
+  <section class="enc-secao">
+    <h2>Perfil do aluno</h2>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label" for="{{ form.habitos.id_for_label }}">Hábitos / rotina</label>{{ form.habitos }}</div>
+      <div class="col-md-6"><label class="form-label" for="{{ form.hobbies.id_for_label }}">Hobbies / interesses</label>{{ form.hobbies }}</div>
+      <div class="col-md-6"><label class="form-label" for="{{ form.pontos_fortes.id_for_label }}">Pontos fortes</label>{{ form.pontos_fortes }}</div>
+      <div class="col-md-6"><label class="form-label" for="{{ form.pontos_fracos.id_for_label }}">Pontos fracos</label>{{ form.pontos_fracos }}</div>
+      <div class="col-md-6"><label class="form-label" for="{{ form.carreira_desejada.id_for_label }}">Carreira desejada</label>{{ form.carreira_desejada }}</div>
+      <div class="col-md-6">
+        <span class="form-label d-block">Sabe utilizar o Plurall?</span>
+        <div class="seg">{% for r in form.sabe_plurall %}{% if r.data.value != "" %}<label>{{ r.tag }}<span>{{ r.choice_label }}</span></label>{% endif %}{% endfor %}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="enc-secao">
+    <h2>Encaminhamento e observações</h2>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label" for="{{ form.encaminhamento.id_for_label }}">Encaminhamento</label>{{ form.encaminhamento }}</div>
+      <div class="col-md-6"><label class="form-label" for="{{ form.motivo_encaminhamento.id_for_label }}">Motivo do encaminhamento</label>{{ form.motivo_encaminhamento }}</div>
+      <div class="col-12"><label class="form-label" for="{{ form.observacoes.id_for_label }}">Observações</label>{{ form.observacoes }}</div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 mt-4">
+      <a class="btn btn-outline-secondary" href="{% url 'encontros:lista' %}">Cancelar</a>
+      <button class="btn btn-primary" type="submit">Salvar encontro</button>
+    </div>
+  </section>
+</form>
+<script src="{% static 'js/encontro_form.js' %}"></script>
+{% endblock %}

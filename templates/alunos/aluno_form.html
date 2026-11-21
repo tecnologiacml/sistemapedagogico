@@ -2,22 +2,81 @@
 {% block titulo %}{% if object %}Editar aluno{% else %}Novo aluno{% endif %} · Sistema Pedagógico{% endblock %}
 {% block conteudo %}
 <h1 class="h3 mb-3">{% if object %}Editar aluno{% else %}Novo aluno{% endif %}</h1>
-<form method="post" class="card card-body shadow-sm">
+<form method="post">
   {% csrf_token %}
   {% for erro in form.non_field_errors %}<div class="alert alert-danger">{{ erro }}</div>{% endfor %}
-  <div class="row">
-    {% for field in form %}
-      <div class="col-md-6 mb-3">
-        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-        {% for erro in field.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+
+  <div class="card shadow-sm mb-3"><div class="card-body">
+    <h2 class="h5 mb-3">Dados do aluno</h2>
+    <div class="row">
+      {% include "alunos/_campo.html" with field=form.nome col="col-md-8" %}
+      {% include "alunos/_campo.html" with field=form.data_nascimento col="col-md-4" %}
+      {% include "alunos/_campo.html" with field=form.ra col="col-md-4" %}
+      {% include "alunos/_campo.html" with field=form.cpf col="col-md-4" %}
+      {% include "alunos/_campo.html" with field=form.serie col="col-md-4" %}
+      {% include "alunos/_campo.html" with field=form.unidade col="col-md-6" %}
+      {% include "alunos/_campo.html" with field=form.responsavel_pedagogico col="col-md-6" %}
+    </div>
+  </div></div>
+
+  <div class="card shadow-sm mb-3"><div class="card-body">
+    <h2 class="h5 mb-3">Contato e endereço</h2>
+    <div class="row">
+      {% include "alunos/_campo.html" with field=form.celular col="col-md-4" %}
+      {% include "alunos/_campo.html" with field=form.email col="col-md-8" %}
+      {% include "alunos/_campo.html" with field=form.endereco col="col-md-6" %}
+      {% include "alunos/_campo.html" with field=form.bairro col="col-md-6" %}
+      {% include "alunos/_campo.html" with field=form.cidade col="col-md-6" %}
+      {% include "alunos/_campo.html" with field=form.cep col="col-md-6" %}
+    </div>
+  </div></div>
+
+  <div class="card shadow-sm mb-3" id="responsavel"><div class="card-body">
+    <h2 class="h5 mb-3">Responsável (pai, mãe, avós ou outro)</h2>
+    {% for radio in form.responsavel_opcao %}
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="{{ radio.data.name }}" id="{{ radio.id_for_label }}" value="{{ radio.data.value }}" {% if radio.data.selected %}checked{% endif %}>
+        <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
       </div>
     {% endfor %}
-  </div>
+    {% for erro in form.responsavel_opcao.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+
+    <div id="bloco-existente" class="row mt-3 d-none">
+      {% include "alunos/_campo.html" with field=form.responsavel_existente col="col-md-8" %}
+    </div>
+
+    <div id="bloco-novo" class="mt-3 d-none">
+      <div class="row">
+        {% include "alunos/_campo.html" with field=resp_form.nome col="col-md-8" %}
+        {% include "alunos/_campo.html" with field=resp_form.data_nascimento col="col-md-4" %}
+        {% include "alunos/_campo.html" with field=resp_form.celular col="col-md-4" %}
+        {% include "alunos/_campo.html" with field=resp_form.email col="col-md-8" %}
+        {% include "alunos/_campo.html" with field=resp_form.endereco col="col-md-6" %}
+        {% include "alunos/_campo.html" with field=resp_form.bairro col="col-md-3" %}
+        {% include "alunos/_campo.html" with field=resp_form.cep col="col-md-3" %}
+      </div>
+    </div>
+  </div></div>
+
   <div>
     <button class="btn btn-primary">Salvar</button>
     <a class="btn btn-secondary" href="{% url 'alunos:lista' %}">Cancelar</a>
   </div>
 </form>
+
+<script>
+(function () {
+  var radios = document.querySelectorAll('input[name="responsavel_opcao"]');
+  var existente = document.getElementById('bloco-existente');
+  var novo = document.getElementById('bloco-novo');
+  function atualizar() {
+    var marcado = document.querySelector('input[name="responsavel_opcao"]:checked');
+    var v = marcado ? marcado.value : 'nenhum';
+    existente.classList.toggle('d-none', v !== 'existente');
+    novo.classList.toggle('d-none', v !== 'novo');
+  }
+  radios.forEach(function (r) { r.addEventListener('change', atualizar); });
+  atualizar();
+})();
+</script>
 {% endblock %}

@@ -1,31 +1,58 @@
 {% extends "base.html" %}
 {% block titulo %}{% if object %}Editar usuário{% else %}Novo usuário{% endif %} · Sistema Pedagógico{% endblock %}
 {% block conteudo %}
-<h1 class="h3 mb-3">{% if object %}Editar usuário{% else %}Novo usuário{% endif %}</h1>
+<h1 class="h3 mb-3">{% if object %}Editar usuários{% else %}Novo usuário{% endif %}</h1>
 <div class="row g-4">
-  <div class="col-lg-7">
+  <div class="col-xl-8">
     <form method="post" class="card card-body" novalidate>
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-      {% for campo in form %}
-        <div class="mb-3{% if campo.field.widget.input_type == 'checkbox' %} form-check{% endif %}">
-          {% if campo.field.widget.input_type == 'checkbox' %}
-            {{ campo }}<label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+
+      <div class="row g-3">
+        {% for campo in form %}
+          {% if campo.field.widget.allow_multiple_selected %}
+            <fieldset class="col-12">
+              <legend class="form-label fs-6 mb-1">{{ campo.label }}</legend>
+              <div class="border rounded p-2 px-3">
+                {% for opcao in campo %}
+                  <div class="form-check form-check-inline">
+                    {{ opcao.tag }}
+                    <label class="form-check-label" for="{{ opcao.id_for_label }}">{{ opcao.choice_label }}</label>
+                  </div>
+                {% endfor %}
+              </div>
+              {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+              {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+            </fieldset>
+
+          {% elif campo.field.widget.input_type == 'checkbox' %}
+            <div class="col-md-6 d-flex align-items-center">
+              <div class="form-check form-switch">
+                {{ campo }}
+                <label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+              </div>
+            </div>
+
           {% else %}
-            <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
-            {{ campo }}
+            <div class="col-md-6">
+              <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+              {{ campo }}
+              {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+              {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+            </div>
           {% endif %}
-          {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
-          {% for erro in campo.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
-        </div>
-      {% endfor %}
-      <div class="d-flex gap-2">
+        {% endfor %}
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
         <button class="btn btn-primary">Salvar</button>
         <a class="btn btn-outline-secondary" href="{% url 'usuarios:lista' %}">Cancelar</a>
       </div>
     </form>
   </div>
-  <div class="col-lg-5">
+
+  <div class="col-xl-4">
     <div class="card card-body">
       <h2 class="h6">O que cada perfil pode fazer</h2>
       <ul class="small mb-0 ps-3">
