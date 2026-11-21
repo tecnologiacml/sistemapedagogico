@@ -121,6 +121,20 @@ class AlunoForm(forms.ModelForm):
             raise ValidationError("Já existe um aluno com este CPF.")
         return digitos
 
+    def clean_ra(self):
+        """R.A. é único em toda a rede (todas as unidades): rejeita duplicado com orientação."""
+        ra = (self.cleaned_data.get("ra") or "").strip().upper()
+        if not ra:
+            return None
+        existente = Aluno.objects.filter(ra__iexact=ra).exclude(pk=self.instance.pk).first()
+        if existente:
+            raise ValidationError(
+                f"Este R.A. já está cadastrado para {existente.nome} (unidade {existente.unidade}). "
+                "Procure o aluno na lista de Alunos, pelo R.A., e atualize o cadastro existente "
+                "em vez de criar outro. Se o R.A. digitado estiver errado, corrija-o."
+            )
+        return ra
+
     def clean_nome(self):
         return " ".join(self.cleaned_data["nome"].split())
 
