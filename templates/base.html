@@ -52,7 +52,23 @@
       {% block conteudo %}{% endblock %}
     </main>
   </div>
-  <script src="{% static 'js/menu.js' %}"></script>
+    <script src="{% static 'js/menu.js' %}"></script>
+  <script>
+    // 15 min sem mexer (mouse, teclado, rolagem): ao voltar para a aba, recarrega
+    // e o servidor manda para o login. Também recarrega ao voltar pelo botão "Voltar".
+    (function () {
+      var LIMITE = 15 * 60 * 1000;
+      var ultima = Date.now();
+      function marcar() { ultima = Date.now(); }
+      ["mousemove", "keydown", "click", "scroll", "touchstart"].forEach(function (ev) {
+        window.addEventListener(ev, marcar, { passive: true });
+      });
+      function conferir() { if (Date.now() - ultima > LIMITE) location.reload(); }
+      setInterval(conferir, 30000);
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) conferir(); });
+      window.addEventListener("pageshow", function (e) { if (e.persisted) location.reload(); });
+    })();
+  </script>
 {% endblock %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

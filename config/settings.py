@@ -50,8 +50,9 @@ INSTALLED_APPS = [
 ]
 
 # Encerra a sessão após 1 hora sem usar o sistema
-SESSION_COOKIE_AGE = 60 * 60          # 1 hora
-SESSION_SAVE_EVERY_REQUEST = True     # cada clique/página renova o prazo
+SESSION_COOKIE_AGE = 15 * 60          # 15 minutos sem usar = pede login de novo
+SESSION_SAVE_EVERY_REQUEST = True     # cada página aberta renova o prazo
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # fechar o navegador também encerra a sessão
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -60,6 +61,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.usuarios.middleware.TrocaSenhaObrigatoriaMiddleware',
+    'apps.usuarios.cache.NaoGuardarEmCacheMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
