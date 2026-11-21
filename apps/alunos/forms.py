@@ -4,6 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from .models import Aluno, Responsavel
+from .validators import somente_digitos, validar_cpf
 
 
 def limpar_celular(valor):
@@ -72,6 +73,11 @@ class AlunoForm(forms.ModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # o CPF pode ser digitado com pontos e traço; o sistema guarda só os números
+        cpf = self.fields["cpf"]
+        cpf.validators = [v for v in cpf.validators if v.__class__.__name__ != "MaxLengthValidator"]
+        cpf.max_length = 14
+        cpf.widget.attrs["maxlength"] = 14
 
         if not self.instance.pk:
             self.fields["unidade"].initial = Aluno.Unidade.CENTRO
@@ -104,6 +110,16 @@ class AlunoForm(forms.ModelForm):
             self.fields["responsavel_opcao"].initial = "nenhum"
 
         _aplicar_css(self)
+
+    def clean_cpf(self):
+        cpf = self.cleaned_data.get("cpf")
+        if not cpf:
+            return None
+        validar_cpf(cpf)  # "CPF inválido." se os dígitos não conferem
+        digitos = somente_digitos(cpf)
+        if Aluno.objects.filter(cpf=digitos).exclude(pk=self.instance.pk).exists():
+            raise ValidationError("Já existe um aluno com este CPF.")
+        return digitos
 
     def clean_nome(self):
         return " ".join(self.cleaned_data["nome"].split())

@@ -1,9 +1,11 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import PasswordChangeView
 from django.db.models import Q
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView
 
-from .forms import UsuarioCriarForm, UsuarioEditarForm
+from .forms import SenhaForm, UsuarioCriarForm, UsuarioEditarForm
 from .mixins import PerfilRequiredMixin
 from .models import Usuario
 
@@ -55,3 +57,21 @@ class UsuarioUpdateView(_SoAdministrador, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Usuário atualizado.")
         return super().form_valid(form)
+
+
+
+class SenhaView(LoginRequiredMixin, PasswordChangeView):
+    """Qualquer pessoa logada troca a própria senha. Quem entrou com senha provisória é levado até aqui."""
+
+    template_name = "usuarios/senha.html"
+    form_class = SenhaForm
+    success_url = reverse_lazy("home")
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        usuario = self.request.user
+        if usuario.precisa_trocar_senha:
+            usuario.precisa_trocar_senha = False
+            usuario.save(update_fields=["precisa_trocar_senha"])
+        messages.success(self.request, "Senha alterada com sucesso.")
+        return resposta

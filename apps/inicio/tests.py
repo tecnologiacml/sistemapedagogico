@@ -34,11 +34,12 @@ class InicioTests(TestCase):
         u = Usuario.objects.create_user("o", email="o@t.local", password="x")
         self.client.force_login(u)
         hoje = timezone.localdate()
+        imagens_antes = self.client.get(reverse("home")).content.decode().count("<img")  # logo do menu
         Aluno.objects.create(nome="Maria Aniversariante", data_nascimento=hoje.replace(year=hoje.year - 10))
         r = self.client.get(reverse("home"))
         self.assertContains(r, "Maria Aniversariante")
         self.assertContains(r, "Hoje")
-        self.assertNotContains(r, "<img")
+        self.assertEqual(r.content.decode().count("<img"), imagens_antes)  # aluno sem foto: nenhuma imagem a mais
 
     def test_aniversario_fora_dos_proximos_7_dias_nao_aparece(self):
         u = Usuario.objects.create_user("o", email="o@t.local", password="x")

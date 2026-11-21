@@ -39,6 +39,7 @@
         <span class="d-none d-md-inline small">Olá, {{ user.get_full_name|default:user.username }}
           <span class="text-muted">· {{ user.get_perfil_display }}</span></span>
         <span class="ml-avatar">{{ user.username|slice:":2"|upper }}</span>
+        <a class="btn btn-link btn-sm text-decoration-none" href="{% url 'usuarios:senha' %}">Trocar senha</a>
         <form method="post" action="{% url 'logout' %}">
           {% csrf_token %}<button class="btn btn-outline-primary btn-sm">Sair</button>
         </form>

@@ -1,14 +1,16 @@
 {% extends "base.html" %}
+{% load static %}
 {% block titulo %}Usuários · Sistema Pedagógico{% endblock %}
 {% block conteudo %}
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0">Usuários</h1>
   <a class="btn btn-primary" href="{% url 'usuarios:criar' %}">Novo usuário</a>
 </div>
-<form method="get" class="input-group mb-3">
+<form method="get" class="input-group mb-3" data-busca-ao-vivo="#resultados">
   <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por nome, usuário ou e-mail" aria-label="Buscar usuário">
   <button class="btn btn-outline-secondary">Buscar</button>
 </form>
+<div id="resultados" aria-live="polite">
 <div class="table-responsive">
 <table class="table table-striped bg-white align-middle">
   <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th>Perfil</th><th>Permissão</th><th>Situação</th><th></th></tr></thead>
@@ -20,7 +22,7 @@
       <td>{{ u.email }}</td>
       <td>{{ u.get_perfil_display }}</td>
       <td>{{ u.nivel_acesso }}</td>
-      <td>{% if u.is_active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}</td>
+      <td>{% if u.is_active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}{% if u.precisa_trocar_senha %}<div class="small text-muted">senha provisória</div>{% endif %}</td>
       <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'usuarios:editar' u.pk %}">Editar</a></td>
     </tr>
   {% empty %}
@@ -36,4 +38,6 @@
   {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Próxima</a></li>{% endif %}
 </ul></nav>
 {% endif %}
+</div>
+<script defer src="{% static 'js/busca_ao_vivo.js' %}"></script>
 {% endblock %}

@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.forms import BaseUserCreationForm
+from django.contrib.auth.forms import BaseUserCreationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import validate_password
 
 from .models import Usuario
@@ -67,6 +67,7 @@ class UsuarioCriarForm(BaseUserCreationForm):
     def save(self, commit=True):
         usuario = super().save(commit=False)
         usuario.permissoes_extras = _extras_efetivos(usuario.perfil, self.cleaned_data.get("permissoes_extras"))
+        usuario.precisa_trocar_senha = True  # a senha inicial é provisória: a pessoa cria a própria ao entrar
         if commit:
             usuario.save()
             if hasattr(self, "save_m2m"):
@@ -78,7 +79,8 @@ class UsuarioEditarForm(forms.ModelForm):
     nova_senha = forms.CharField(
         label="Nova senha (opcional)", required=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
-        help_text="Deixe em branco para manter a senha atual.",
+        help_text="Deixe em branco para manter a senha atual. Se você definir uma senha, "
+        "a pessoa será pedida a criar a própria no próximo acesso.",
     )
     permissoes_extras = _campo_extras()
 
@@ -89,6 +91,7 @@ class UsuarioEditarForm(forms.ModelForm):
 
     def __init__(self, *args, usuario_logado=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.usuario_logado = usuario_logado
         self.fields["first_name"].required = True
         self.fields["last_name"].required = True
         self.initial["permissoes_extras"] = list(self.instance.permissoes_extras or [])
@@ -119,7 +122,27 @@ class UsuarioEditarForm(forms.ModelForm):
         usuario = super().save(commit=False)
         if self.cleaned_data.get("nova_senha"):
             usuario.set_password(self.cleaned_data["nova_senha"])
+            # senha definida pelo administrador para OUTRA pessoa é provisória; na própria conta, não
+            if self.usuario_logado is None or self.usuario_logado.pk != usuario.pk:
+                usuario.precisa_trocar_senha = True
         usuario.permissoes_extras = _extras_efetivos(usuario.perfil, self.cleaned_data.get("permissoes_extras"))
         if commit:
             usuario.save()
         return usuario
+
+
+class SenhaForm(PasswordChangeForm):
+    """A própria pessoa troca a senha (pede a atual e confere a nova)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["old_password"].label = "Senha atual"
+        self.fields["new_password1"].label = "Nova senha"
+        self.fields["new_password2"].label = "Repita a nova senha"
+        _estilizar(self)
+
+    def clean_new_password1(self):
+        nova = self.cleaned_data["new_password1"]
+        if self.user.check_password(nova):
+            raise forms.ValidationError("A nova senha precisa ser diferente da atual.")
+        return nova
