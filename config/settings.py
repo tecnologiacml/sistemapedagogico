@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'apps.alunos',
     'apps.encontros',
     'apps.importacao',
+    'apps.turmas',
 ]
 
 # Encerra a sessão após 1 hora sem usar o sistema

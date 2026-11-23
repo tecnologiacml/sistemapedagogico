@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}Turmas · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Turmas</h1>
+  {% if pode_gerenciar %}<a class="btn btn-primary" href="{% url 'turmas:criar' %}">Nova turma</a>{% endif %}
+</div>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-12 col-md-3">
+    <label class="form-label small mb-1" for="f-ano">Ano letivo</label>
+    <select class="form-select" id="f-ano" name="ano">
+      {% for a in anos %}<option value="{{ a.pk }}" {% if a.pk == ano_sel %}selected{% endif %}>{{ a.ano }}</option>{% endfor %}
+      <option value="todos" {% if ano_sel == "todos" %}selected{% endif %}>Todos os anos</option>
+    </select>
+  </div>
+  <div class="col-12 col-md-3">
+    <label class="form-label small mb-1" for="f-unidade">Unidade</label>
+    <select class="form-select" id="f-unidade" name="unidade">
+      <option value="">Todas</option>
+      {% for u in unidades %}<option value="{{ u.pk }}" {% if u.pk == unidade_sel %}selected{% endif %}>{{ u.nome }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-md-4">
+    <label class="form-label small mb-1" for="f-q">Turma ou série</label>
+    <input class="form-control" id="f-q" type="search" name="q" value="{{ q }}" placeholder="Buscar por turma ou série">
+  </div>
+  <div class="col-12 col-md-2 d-flex align-items-end">
+    <button class="btn btn-outline-secondary w-100">Filtrar</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+<table class="table table-striped bg-white align-middle">
+  <thead><tr><th>Ano letivo</th><th>Turma</th><th>Série</th><th>Unidade</th><th>Situação</th><th></th></tr></thead>
+  <tbody>
+  {% for t in object_list %}
+    <tr>
+      <td>{{ t.ano_letivo.ano }}</td>
+      <td>{{ t.nome }}</td>
+      <td>{{ t.serie.nome }}</td>
+      <td>{{ t.unidade.nome }}</td>
+      <td>{% if t.ativa %}<span class="badge text-bg-success">Ativa</span>{% else %}<span class="badge text-bg-secondary">Inativa</span>{% endif %}</td>
+      <td class="text-end">{% if pode_gerenciar %}<a class="btn btn-sm btn-outline-primary" href="{% url 'turmas:editar' t.pk %}">Editar</a>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="text-center text-muted">Nenhuma turma encontrada para este filtro.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if is_paginated %}
+<nav aria-label="Páginas"><ul class="pagination">
+  {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?ano={{ ano_sel }}&unidade={{ unidade_sel }}&q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>{% endif %}
+  <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span></li>
+  {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?ano={{ ano_sel }}&unidade={{ unidade_sel }}&q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Próxima</a></li>{% endif %}
+</ul></nav>
+{% endif %}
+{% endblock %}

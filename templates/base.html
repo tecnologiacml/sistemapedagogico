@@ -19,8 +19,8 @@
       <li><a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}ativo{% endif %}"{% if request.resolver_match.url_name == 'home' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="home" %}Início</a></li>
       <li><a href="{% url 'alunos:lista' %}" class="{% if request.resolver_match.namespace == 'alunos' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'alunos' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="alunos" %}Alunos</a></li>
       <li><a href="{% url 'encontros:lista' %}" class="{% if request.resolver_match.namespace == 'encontros' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'encontros' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="encontros" %}Encontros</a></li>
-      {# Turmas, Dashboards e Relatórios: ativar quando os módulos existirem #}
-      <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="turmas" %}Turmas</a></li>
+      {# Dashboards e Relatórios: ativar quando os módulos existirem #}
+      <li><a href="{% url 'turmas:lista' %}" class="{% if request.resolver_match.namespace == 'turmas' %}ativo{% endif %}"{% if request.resolver_match.namespace == 'turmas' %} aria-current="page"{% endif %}>{% include "_icones.html" with nome="turmas" %}Turmas</a></li>
       <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="grafico" %}Dashboards</a></li>
       <li><a href="#" class="disabled" aria-disabled="true" title="Em breve">{% include "_icones.html" with nome="relatorios" %}Relatórios</a></li>
       {% if user.pode_gerenciar_usuarios %}
@@ -52,7 +52,7 @@
       {% block conteudo %}{% endblock %}
     </main>
   </div>
-    <script src="{% static 'js/menu.js' %}"></script>
+  <script src="{% static 'js/menu.js' %}"></script>
   <script>
     // 15 min sem mexer (mouse, teclado, rolagem): ao voltar para a aba, recarrega
     // e o servidor manda para o login. Também recarrega ao voltar pelo botão "Voltar".
