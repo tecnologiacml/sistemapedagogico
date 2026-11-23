@@ -11,5 +11,6 @@ urlpatterns = [
     path("importacao/", include("apps.importacao.urls")),
     path("encontros/", include("apps.encontros.urls")),
     path("usuarios/", include("apps.usuarios.urls")),
+    path("turmas/", include("apps.turmas.urls")),
     path("", InicioView.as_view(), name="home"),
 ]
