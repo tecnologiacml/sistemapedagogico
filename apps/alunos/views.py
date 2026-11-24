@@ -51,7 +51,9 @@ class AlunoListView(LoginRequiredMixin, ListView):
 
 class AlunoDetailView(LoginRequiredMixin, DetailView):
     model = Aluno
-    queryset = Aluno.objects.select_related("responsavel", "responsavel_pedagogico")
+    queryset = Aluno.objects.select_related("responsavel", "responsavel_pedagogico").prefetch_related(
+        "matriculas__turma__serie", "matriculas__turma__unidade", "matriculas__turma__ano_letivo"
+    )
 
 
 class AlunoSalvarMixin(PodeEditarMixin):

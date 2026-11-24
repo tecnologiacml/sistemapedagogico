@@ -27,6 +27,29 @@
   </dl>
 </div></div>
 
+<div class="card shadow-sm mb-3"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Matrículas</h2>
+    {% if user.pode_editar_alunos %}<a class="btn btn-outline-primary btn-sm" href="{% url 'turmas:matricular' object.pk %}">{% if object.matriculas.all %}Trocar de turma / nova matrícula{% else %}Matricular em uma turma{% endif %}</a>{% endif %}
+  </div>
+  {% if object.matriculas.all %}
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Ano</th><th>Unidade</th><th>Série</th><th>Turma</th><th>Início</th><th>Fim</th><th>Situação</th></tr></thead>
+    <tbody>
+    {% for m in object.matriculas.all %}
+      <tr>
+        <td>{{ m.turma.ano_letivo }}</td><td>{{ m.turma.unidade }}</td><td>{{ m.turma.serie }}</td><td>{{ m.turma.nome }}</td>
+        <td>{{ m.data_inicio|date:"d/m/Y" }}</td><td>{{ m.data_fim|date:"d/m/Y"|default:"—" }}</td>
+        <td>{% if m.situacao == "ativa" %}<span class="badge text-bg-success">{{ m.get_situacao_display }}</span>{% else %}<span class="badge text-bg-secondary">{{ m.get_situacao_display }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <p class="text-muted mb-0">Este aluno ainda não tem matrícula em turma.</p>
+  {% endif %}
+</div></div>
+
 <div class="card shadow-sm"><div class="card-body">
   <h2 class="h5 mb-3">Responsável (pai, mãe, avós ou outro)</h2>
   {% if object.responsavel %}
