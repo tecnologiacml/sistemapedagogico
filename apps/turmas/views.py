@@ -1,12 +1,16 @@
 from django.contrib import messages
 from django.db.models import Q
-from django.urls import reverse_lazy
+from django.shortcuts import get_object_or_404
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.views.generic import CreateView, ListView, UpdateView
+from django.utils.functional import cached_property
+from django.views.generic import CreateView, FormView, ListView, UpdateView
 
+from apps.alunos.models import Aluno
 from apps.usuarios.mixins import PerfilRequiredMixin
 
-from .forms import TurmaForm
+from .forms import MatriculaForm, TurmaForm
+from .services import MatriculaInvalida, matricular
 from .models import AnoLetivo, Turma, Unidade
 
 # Por ora só o Administrador cadastra turmas (a secretaria ainda não é um perfil do sistema).
@@ -82,3 +86,39 @@ class TurmaUpdateView(PerfilRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Turma atualizada com sucesso.")
         return super().form_valid(form)
+
+
+class MatricularView(PerfilRequiredMixin, FormView):
+    """Matricula o aluno em uma turma ou troca de turma, preservando o histórico (US-008)."""
+
+    permissao = "pode_editar_alunos"
+    form_class = MatriculaForm
+    template_name = "turmas/matricula_form.html"
+
+    @cached_property
+    def aluno(self):
+        # só é buscado depois da checagem de login e permissão
+        return get_object_or_404(Aluno, pk=self.kwargs["aluno_pk"])
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["aluno"] = self.aluno
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["aluno"] = self.aluno
+        ctx["atual"] = ctx["form"].atual
+        return ctx
+
+    def form_valid(self, form):
+        try:
+            matricular(self.aluno, form.cleaned_data["turma"], form.cleaned_data["data_inicio"])
+        except MatriculaInvalida as erro:
+            form.add_error(None, str(erro))
+            return self.form_invalid(form)
+        messages.success(self.request, "Matrícula registrada. O histórico anterior foi preservado.")
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("alunos:detalhe", args=[self.aluno.pk])

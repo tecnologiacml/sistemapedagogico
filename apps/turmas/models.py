@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models import F, Q
+from django.utils import timezone
 
 
 class Unidade(models.Model):
@@ -68,3 +70,43 @@ class Turma(models.Model):
 
     def __str__(self):
         return f"{self.nome} · {self.ano_letivo}"
+
+
+class Matricula(models.Model):
+    """Vínculo do estudante com uma turma (e, por ela, unidade, série e ano letivo).
+
+    Cada ano letivo gera uma matrícula nova. As anteriores nunca são apagadas nem
+    sobrescritas: só são encerradas (data_fim e situação). Ver US-008 e RN-02.
+    """
+
+    class Situacao(models.TextChoices):
+        ATIVA = "ativa", "Ativa"
+        TRANSFERIDA = "transferida", "Transferida de turma"
+        CONCLUIDA = "concluida", "Concluída"
+        CANCELADA = "cancelada", "Cancelada"
+
+    aluno = models.ForeignKey("alunos.Aluno", on_delete=models.CASCADE, related_name="matriculas")
+    turma = models.ForeignKey(Turma, on_delete=models.PROTECT, related_name="matriculas")
+    data_inicio = models.DateField(default=timezone.localdate)
+    data_fim = models.DateField(null=True, blank=True)
+    situacao = models.CharField(max_length=20, choices=Situacao.choices, default=Situacao.ATIVA)
+
+    class Meta:
+        db_table = "matriculas"
+        ordering = ["-data_inicio", "-id"]
+        verbose_name = "Matrícula"
+        verbose_name_plural = "Matrículas"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["aluno"],
+                condition=Q(situacao="ativa"),
+                name="matricula_ativa_unica_por_aluno",
+            ),
+            models.CheckConstraint(
+                condition=Q(data_fim__isnull=True) | Q(data_fim__gte=F("data_inicio")),
+                name="matricula_fim_depois_do_inicio",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.aluno} · {self.turma}"

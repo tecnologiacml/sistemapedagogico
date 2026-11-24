@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Matrícula · {{ aluno.nome }} · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<h1 class="h3 mb-1">{% if atual %}Trocar de turma{% else %}Matricular em uma turma{% endif %}</h1>
+<p class="text-muted mb-3">{{ aluno.nome }}{% if aluno.ra %} · R.A. {{ aluno.ra }}{% endif %}</p>
+
+{% if atual %}
+<div class="alert alert-info">
+  Matrícula atual: <strong>{{ atual.turma.ano_letivo }} · {{ atual.turma.unidade }} · {{ atual.turma.serie }} · {{ atual.turma.nome }}</strong>,
+  desde {{ atual.data_inicio|date:"d/m/Y" }}.
+  Ao salvar, ela será encerrada e continuará no histórico do aluno.
+</div>
+{% endif %}
+
+<form method="post" class="card shadow-sm"><div class="card-body">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="row">
+    <div class="col-md-8 mb-3">
+      <label class="form-label" for="{{ form.turma.id_for_label }}">Nova turma</label>
+      {{ form.turma }}
+      {% for e in form.turma.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="col-md-4 mb-3">
+      <label class="form-label" for="{{ form.data_inicio.id_for_label }}">Data da matrícula</label>
+      {{ form.data_inicio }}
+      {% for e in form.data_inicio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+  </div>
+  <button class="btn btn-primary">Salvar matrícula</button>
+  <a class="btn btn-secondary" href="{% url 'alunos:detalhe' aluno.pk %}">Cancelar</a>
+</div></form>
+{% endblock %}
