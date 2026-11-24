@@ -4,7 +4,10 @@
 {% block conteudo %}
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0">Usuários</h1>
-  <a class="btn btn-primary" href="{% url 'usuarios:criar' %}">Novo usuário</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'usuarios:auditoria' %}">Histórico de alterações</a>
+    <a class="btn btn-primary" href="{% url 'usuarios:criar' %}">Novo usuário</a>
+  </div>
 </div>
 <form method="get" class="input-group mb-3" data-busca-ao-vivo="#resultados">
   <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por nome, usuário ou e-mail" aria-label="Buscar usuário">
@@ -23,7 +26,7 @@
       <td>{{ u.get_perfil_display }}</td>
       <td>{{ u.nivel_acesso }}</td>
       <td>{% if u.is_active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}{% if u.precisa_trocar_senha %}<div class="small text-muted">senha provisória</div>{% endif %}</td>
-      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'usuarios:editar' u.pk %}">Editar</a></td>
+      <td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="{% url 'usuarios:auditoria' %}?usuario={{ u.pk }}">Histórico</a> <a class="btn btn-sm btn-outline-primary" href="{% url 'usuarios:editar' u.pk %}">Editar</a></td>
     </tr>
   {% empty %}
     <tr><td colspan="7" class="text-center text-muted">Nenhum usuário encontrado.</td></tr>

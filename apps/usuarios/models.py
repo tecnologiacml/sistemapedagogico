@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 
 class Usuario(AbstractUser):
@@ -93,3 +95,39 @@ class Usuario(AbstractUser):
         if extras and base == "Somente visualiza":
             base = "Visualiza"
         return f"{base} (+{len(extras)} liberação extra)" if extras else base
+
+
+class RegistroAuditoria(models.Model):
+    """Quem mudou o quê, e quando, nas contas de usuário (US-003).
+
+    Guarda o nome de usuário junto, para o registro continuar legível mesmo se a conta for removida.
+    """
+
+    class Acao(models.TextChoices):
+        CRIADO = "criado", "Conta criada"
+        ALTERADO = "alterado", "Dados alterados"
+        SENHA_REDEFINIDA = "senha_redefinida", "Senha redefinida pelo administrador"
+        SENHA_ALTERADA = "senha_alterada", "Senha alterada pelo próprio usuário"
+
+    alvo = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="auditoria_recebida",
+    )
+    alvo_username = models.CharField(max_length=150)
+    feito_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="auditoria_feita",
+    )
+    feito_por_username = models.CharField(max_length=150, blank=True, default="")
+    acao = models.CharField(max_length=20, choices=Acao.choices)
+    alteracoes = models.JSONField(default=list, blank=True)  # [{"campo", "antes", "depois"}]
+    em = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        db_table = "auditoria_usuarios"
+        ordering = ["-em", "-id"]
+        verbose_name = "Registro de auditoria"
+        verbose_name_plural = "Registros de auditoria"
+
+    def __str__(self):
+        return f"{self.get_acao_display()} · {self.alvo_username} · {self.em:%d/%m/%Y %H:%M}"
