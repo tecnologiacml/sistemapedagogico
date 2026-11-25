@@ -10,22 +10,62 @@
   </div>
 </div>
 
-<form method="get" class="input-group mb-3" data-busca-ao-vivo="#resultados">
-  <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por aluno ou RA">
-  <button class="btn btn-outline-secondary">Buscar</button>
+<form method="get" class="mb-3" data-busca-ao-vivo="#resultados">
+  <div class="input-group mb-2">
+    <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Buscar por nome, RA ou CPF" aria-label="Buscar aluno">
+    <button class="btn btn-outline-secondary">Buscar</button>
+  </div>
+  <div class="row g-2">
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="f-ano">Ano letivo</label>
+      <select class="form-select form-select-sm" id="f-ano" name="ano">
+        <option value="">Todos</option>
+        {% for a in anos %}<option value="{{ a.pk }}" {% if a.pk == ano_sel %}selected{% endif %}>{{ a.ano }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1" for="f-unidade">Unidade</label>
+      <select class="form-select form-select-sm" id="f-unidade" name="unidade">
+        <option value="">Todas</option>
+        {% for u in unidades %}<option value="{{ u.pk }}" {% if u.pk == unidade_sel %}selected{% endif %}>{{ u.nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="f-serie">Série</label>
+      <select class="form-select form-select-sm" id="f-serie" name="serie">
+        <option value="">Todas</option>
+        {% for s in series %}<option value="{{ s.pk }}" {% if s.pk == serie_sel %}selected{% endif %}>{{ s.nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="f-turma">Turma</label>
+      <select class="form-select form-select-sm" id="f-turma" name="turma">
+        <option value="">Todas</option>
+        {% for t in turmas %}<option value="{{ t.pk }}" {% if t.pk == turma_sel %}selected{% endif %}>{{ t.nome }} · {{ t.unidade }} · {{ t.ano_letivo }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-2 d-flex align-items-end">
+      <a class="btn btn-sm btn-link" href="{% url 'alunos:lista' %}">Limpar filtros</a>
+    </div>
+  </div>
 </form>
 
 <div id="resultados" aria-live="polite">
 <div class="table-responsive">
 <table class="table table-striped bg-white align-middle">
   <thead>
-    <tr><th>RA</th><th>Aluno</th><th>Responsável pedagógico</th><th style="width:110px"></th></tr>
+    <tr><th>RA</th><th>Aluno</th><th>Turma atual</th><th>Responsável pedagógico</th><th style="width:110px"></th></tr>
   </thead>
   <tbody>
   {% for aluno in object_list %}
     <tr>
       <td>{{ aluno.ra|default:"—" }}</td>
-      <td>{{ aluno.nome }}</td>
+      <td>{{ aluno.nome }}<div class="small text-muted">Nasc. {{ aluno.data_nascimento|date:"d/m/Y" }}</div></td>
+      <td>
+        {% with m=aluno.matricula_atual.0 %}
+          {% if m %}{{ m.turma.nome }}<div class="small text-muted">{{ m.turma.ano_letivo }} · {{ m.turma.unidade }} · {{ m.turma.serie }}</div>{% else %}<span class="text-muted">Sem matrícula</span>{% endif %}
+        {% endwith %}
+      </td>
       <td>{% if aluno.responsavel_pedagogico %}{{ aluno.responsavel_pedagogico.get_full_name|default:aluno.responsavel_pedagogico.username }}{% else %}—{% endif %}</td>
       <td class="text-end text-nowrap">
         <a class="btn btn-sm btn-outline-primary" href="{% url 'alunos:detalhe' aluno.pk %}" title="Ver detalhes" aria-label="Ver detalhes de {{ aluno.nome }}">
@@ -39,7 +79,7 @@
       </td>
     </tr>
   {% empty %}
-    <tr><td colspan="4" class="text-center text-muted">Nenhum aluno encontrado.</td></tr>
+    <tr><td colspan="5" class="text-center text-muted">Nenhum aluno encontrado.</td></tr>
   {% endfor %}
   </tbody>
 </table>
@@ -47,9 +87,9 @@
 
 {% if is_paginated %}
 <nav><ul class="pagination">
-  {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>{% endif %}
+  {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="{% querystring page=page_obj.previous_page_number %}">Anterior</a></li>{% endif %}
   <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span></li>
-  {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Próxima</a></li>{% endif %}
+  {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="{% querystring page=page_obj.next_page_number %}">Próxima</a></li>{% endif %}
 </ul></nav>
 {% endif %}
 </div>
