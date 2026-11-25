@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block titulo %}Importar matrículas · Sistema Pedagógico{% endblock %}
+{% block conteudo %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Importar matrículas</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'turmas:lista' %}">Voltar para Turmas</a>
+</div>
+
+<div class="card shadow-sm mb-3"><div class="card-body">
+  <h2 class="h5">Como funciona</h2>
+  <ol class="mb-3">
+    <li>Baixe a planilha dos alunos que ainda estão em "Sem turma definida".</li>
+    <li>Preencha a coluna <strong>turma</strong> com o nome da turma (por exemplo, "1º ano A") e salve como CSV.</li>
+    <li>Envie aqui. O sistema mostra uma prévia e <strong>só grava depois que você confirmar</strong>.</li>
+  </ol>
+  <p class="small text-muted mb-2">
+    Colunas: <strong>ra</strong> (ou <strong>nome</strong>) e <strong>turma</strong>. Opcionais: <strong>unidade</strong>
+    (padrão: a do aluno) e <strong>ano</strong> (padrão: ano letivo atual). A turma precisa já estar cadastrada em Turmas.
+    A matrícula anterior é encerrada e continua no histórico do aluno.
+  </p>
+  <a class="btn btn-sm btn-outline-primary" href="{% url 'turmas:alunos_sem_turma' %}">Baixar alunos sem turma (CSV)</a>
+</div></div>
+
+<form method="post" enctype="multipart/form-data" class="card shadow-sm mb-3"><div class="card-body">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="row">
+    <div class="col-md-7 mb-3">
+      <label class="form-label" for="{{ form.arquivo.id_for_label }}">Planilha (CSV)</label>
+      {{ form.arquivo }}
+      {% for e in form.arquivo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="col-md-5 mb-3">
+      <label class="form-label" for="{{ form.data_inicio.id_for_label }}">Data das matrículas</label>
+      {{ form.data_inicio }}
+      {% for e in form.data_inicio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+  </div>
+  <button class="btn btn-primary">Conferir planilha</button>
+</div></form>
+
+{% if previa %}
+<div class="card shadow-sm mb-3"><div class="card-body">
+  <h2 class="h5">Prévia (nada foi gravado ainda)</h2>
+  <p class="mb-2">
+    <span class="badge text-bg-success">{{ n_ok }} para matricular</span>
+    <span class="badge text-bg-secondary">{{ n_ignorados }} já na turma</span>
+    <span class="badge text-bg-danger">{{ n_erros }} com erro</span>
+  </p>
+  {% if n_erros %}<p class="small text-muted">As linhas com erro não serão aplicadas. Corrija na planilha e envie de novo, ou aplique só as válidas.</p>{% endif %}
+  {% if n_ok %}
+  <form method="post" class="mb-3">
+    {% csrf_token %}
+    <input type="hidden" name="confirmar" value="1">
+    <button class="btn btn-success">Aplicar {{ n_ok }} matrícula(s) com data {{ data|date:"d/m/Y" }}</button>
+  </form>
+  {% endif %}
+  <div class="table-responsive" style="max-height: 480px; overflow-y: auto">
+  <table class="table table-sm table-striped align-middle mb-0">
+    <thead><tr><th>Linha</th><th>R.A.</th><th>Aluno</th><th>Turma na planilha</th><th>Situação</th></tr></thead>
+    <tbody>
+    {% for r in previa %}
+      <tr>
+        <td>{{ r.numero }}</td><td>{{ r.ra|default:"—" }}</td><td>{{ r.nome|default:"—" }}</td><td>{{ r.turma_texto|default:"—" }}</td>
+        <td>
+          {% if r.status == "ok" %}<span class="badge text-bg-success">Matricular</span> {{ r.turma_exibida }}
+          {% elif r.status == "ignorado" %}<span class="badge text-bg-secondary">Ignorada</span> {{ r.mensagem }}
+          {% else %}<span class="badge text-bg-danger">Erro</span> {{ r.mensagem }}{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div></div>
+{% endif %}
+{% endblock %}

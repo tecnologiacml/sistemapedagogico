@@ -63,3 +63,26 @@ class MatriculaForm(forms.Form):
                 f"A data não pode ser anterior ao início da matrícula atual ({self.atual.data_inicio:%d/%m/%Y})."
             )
         return data
+
+
+class ImportarMatriculasForm(forms.Form):
+    arquivo = forms.FileField(
+        label="Planilha (CSV)",
+        widget=forms.ClearableFileInput(attrs={"accept": ".csv,text/csv", "class": "form-control"}),
+    )
+    data_inicio = forms.DateField(
+        label="Data das matrículas",
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}, format="%Y-%m-%d"),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["data_inicio"].initial = timezone.localdate()
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data["arquivo"]
+        if not arquivo.name.lower().endswith(".csv"):
+            raise forms.ValidationError("Envie um arquivo .csv (no Excel: Salvar como > CSV).")
+        if arquivo.size > 2 * 1024 * 1024:
+            raise forms.ValidationError("O arquivo passa de 2 MB.")
+        return arquivo

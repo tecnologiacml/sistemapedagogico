@@ -3,7 +3,10 @@
 {% block conteudo %}
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0">Turmas</h1>
-  {% if pode_gerenciar %}<a class="btn btn-primary" href="{% url 'turmas:criar' %}">Nova turma</a>{% endif %}
+  <div class="d-flex gap-2">
+    {% if user.pode_editar_alunos %}<a class="btn btn-outline-secondary" href="{% url 'turmas:importar_matriculas' %}">Importar matrículas</a>{% endif %}
+    {% if pode_gerenciar %}<a class="btn btn-primary" href="{% url 'turmas:criar' %}">Nova turma</a>{% endif %}
+  </div>
 </div>
 
 <form method="get" class="row g-2 mb-3">
