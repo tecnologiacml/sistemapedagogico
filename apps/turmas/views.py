@@ -1,17 +1,23 @@
+import csv
+from datetime import date
+
 from django.contrib import messages
+from django.http import HttpResponse
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.views import View
 from django.views.generic import CreateView, FormView, ListView, UpdateView
 
 from apps.alunos.models import Aluno
 from apps.usuarios.mixins import PerfilRequiredMixin
 
-from .forms import MatriculaForm, TurmaForm
-from .services import MatriculaInvalida, matricular
-from .models import AnoLetivo, Turma, Unidade
+from . import importar
+from .forms import ImportarMatriculasForm, MatriculaForm, TurmaForm
+from .models import AnoLetivo, Matricula, Turma, Unidade
+from .services import MatriculaInvalida, matricular, matricular_em_lote
 
 # Por ora só o Administrador cadastra turmas (a secretaria ainda não é um perfil do sistema).
 PERMISSAO_GERENCIAR = "pode_gerenciar_usuarios"
@@ -122,3 +128,78 @@ class MatricularView(PerfilRequiredMixin, FormView):
 
     def get_success_url(self):
         return reverse("alunos:detalhe", args=[self.aluno.pk])
+
+
+SESSAO_IMPORTACAO = "importar_matriculas"
+
+
+class ImportarMatriculasView(PerfilRequiredMixin, View):
+    """Troca de turma em lote por planilha: envia, confere (prévia) e só então aplica."""
+
+    permissao = "pode_editar_alunos"
+    template_name = "turmas/importar_matriculas.html"
+
+    def get(self, request):
+        return render(request, self.template_name, {"form": ImportarMatriculasForm()})
+
+    def post(self, request):
+        if request.POST.get("confirmar"):
+            return self.confirmar(request)
+        form = ImportarMatriculasForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return render(request, self.template_name, {"form": form})
+        try:
+            linhas = importar.ler_planilha(form.cleaned_data["arquivo"].read())
+        except importar.PlanilhaInvalida as erro:
+            form.add_error("arquivo", str(erro))
+            return render(request, self.template_name, {"form": form})
+        previa = importar.validar(linhas)
+        validas = [(r["aluno_id"], r["turma_id"]) for r in previa if r["status"] == importar.OK]
+        request.session[SESSAO_IMPORTACAO] = {
+            "pares": validas, "data": form.cleaned_data["data_inicio"].isoformat(),
+        }
+        ordem = {importar.ERRO: 0, importar.IGNORADO: 1, importar.OK: 2}
+        contexto = {
+            "form": ImportarMatriculasForm(initial={"data_inicio": form.cleaned_data["data_inicio"]}),
+            "previa": sorted(previa, key=lambda r: (ordem[r["status"]], r["numero"])),
+            "n_ok": len(validas),
+            "n_ignorados": sum(r["status"] == importar.IGNORADO for r in previa),
+            "n_erros": sum(r["status"] == importar.ERRO for r in previa),
+            "data": form.cleaned_data["data_inicio"],
+        }
+        return render(request, self.template_name, contexto)
+
+    def confirmar(self, request):
+        dados = request.session.pop(SESSAO_IMPORTACAO, None)
+        if not dados or not dados["pares"]:
+            messages.error(request, "Não há importação para aplicar. Envie a planilha de novo.")
+            return redirect("turmas:importar_matriculas")
+        data = date.fromisoformat(dados["data"])
+        alunos = Aluno.objects.in_bulk([a for a, _ in dados["pares"]])
+        turmas = Turma.objects.select_related("unidade", "serie").in_bulk([t for _, t in dados["pares"]])
+        pares = [(alunos[a], turmas[t]) for a, t in dados["pares"] if a in alunos and t in turmas]
+        aplicadas, ignoradas = matricular_em_lote(pares, data)
+        texto = f"{aplicadas} matrícula(s) registrada(s). O histórico anterior foi preservado."
+        if ignoradas:
+            texto += f" {ignoradas} ignorada(s) por já estarem na turma ou por data anterior."
+        messages.success(request, texto)
+        return redirect("turmas:lista")
+
+
+class ExportarSemTurmaView(PerfilRequiredMixin, View):
+    """Planilha com os alunos que ainda estão na turma provisória, para preencher a coluna "turma"."""
+
+    permissao = "pode_editar_alunos"
+
+    def get(self, request):
+        ativas = Matricula.objects.filter(
+            situacao=Matricula.Situacao.ATIVA, turma__nome__startswith=importar.PREFIXO_PROVISORIA
+        ).select_related("aluno").order_by("aluno__nome")
+        resposta = HttpResponse(content_type="text/csv; charset=utf-8")
+        resposta["Content-Disposition"] = 'attachment; filename="alunos_sem_turma.csv"'
+        resposta.write("\ufeff")  # para o Excel abrir os acentos certos
+        escritor = csv.writer(resposta, delimiter=";")
+        escritor.writerow(["ra", "nome", "unidade", "turma"])
+        for m in ativas:
+            escritor.writerow([m.aluno.ra or "", m.aluno.nome, m.aluno.unidade, ""])
+        return resposta
