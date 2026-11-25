@@ -1,5 +1,5 @@
 /* Busca em tempo real: ao digitar, atualiza só a lista (sem recarregar a página).
-   Uso: <form data-busca-ao-vivo="#resultados"> com um campo name="q" e um bloco #resultados.
+   Uso: <form data-busca-ao-vivo="#resultados"> com um campo name="q", filtros opcionais (selects) e um bloco #resultados.
    Sem JavaScript, o botão Buscar continua funcionando do jeito normal. */
 (function () {
   var form = document.querySelector("form[data-busca-ao-vivo]");
@@ -41,14 +41,28 @@
       });
   }
 
+  // Monta a URL com todos os campos do formulário (busca e filtros), ignorando os vazios.
   function urlDaBusca() {
-    var texto = campo.value.trim();
-    return base + (texto ? "?q=" + encodeURIComponent(texto) : "");
+    var params = new URLSearchParams();
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || el.disabled) return;
+      var valor = (el.value || "").trim();
+      if (valor) params.append(el.name, valor);
+    });
+    var texto = params.toString();
+    return base + (texto ? "?" + texto : "");
   }
 
   campo.addEventListener("input", function () {
     clearTimeout(espera);
     espera = setTimeout(function () { carregar(urlDaBusca()); }, 100);
+  });
+  // trocar um filtro (lista suspensa) atualiza a lista na hora
+  form.addEventListener("change", function (e) {
+    if (e.target.tagName === "SELECT") {
+      clearTimeout(espera);
+      carregar(urlDaBusca());
+    }
   });
   form.addEventListener("submit", function (e) {
     e.preventDefault();

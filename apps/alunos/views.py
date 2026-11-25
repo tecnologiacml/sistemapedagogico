@@ -1,12 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView, UpdateView,
 )
+
+from apps.turmas.models import AnoLetivo, Matricula, Serie, Turma, Unidade
 
 from .forms import AlunoForm, ResponsavelForm
 from .models import Aluno
@@ -24,28 +26,68 @@ class PodeExcluirMixin(LoginRequiredMixin, UserPassesTestMixin):
 
 
 class AlunoListView(LoginRequiredMixin, ListView):
+    """Lista de alunos com busca (nome, R.A., CPF) e filtros pela matrícula ATUAL: ano, unidade, série e turma."""
+
     model = Aluno
     paginate_by = 20
 
+    def _inteiro(self, nome):
+        valor = self.request.GET.get(nome, "")
+        return int(valor) if valor.isdigit() else None
+
     def get_queryset(self):
-        qs = Aluno.objects.select_related("responsavel", "responsavel_pedagogico").order_by("nome")
+        atual = Prefetch(
+            "matriculas",
+            queryset=Matricula.objects.filter(situacao=Matricula.Situacao.ATIVA).select_related(
+                "turma__serie", "turma__unidade", "turma__ano_letivo"
+            ),
+            to_attr="matricula_atual",
+        )
+        qs = (
+            Aluno.objects.select_related("responsavel", "responsavel_pedagogico")
+            .prefetch_related(atual)
+            .order_by("nome")
+        )
+
+        # Busca: cada palavra precisa aparecer no nome, no R.A. ou (se tiver números) no CPF.
+        # Assim "silva maria" acha "Maria Silva", e dois homônimos aparecem separados na lista.
         self.q = self.request.GET.get("q", "").strip()
-
-        if self.q:
-            filtro = Q(nome__icontains=self.q) | Q(ra__icontains=self.q)
-
-            digitos = somente_digitos(self.q)
-
+        for palavra in self.q.split():
+            filtro = Q(nome__icontains=palavra) | Q(ra__icontains=palavra)
+            digitos = somente_digitos(palavra)
             if digitos:
                 filtro |= Q(cpf__contains=digitos)
-
             qs = qs.filter(filtro)
 
+        # Filtros: valem para a matrícula ativa do aluno (todos na mesma matrícula).
+        self.filtros = {
+            "ano": self._inteiro("ano"),
+            "unidade": self._inteiro("unidade"),
+            "serie": self._inteiro("serie"),
+            "turma": self._inteiro("turma"),
+        }
+        condicoes = {}
+        if self.filtros["ano"]:
+            condicoes["matriculas__turma__ano_letivo_id"] = self.filtros["ano"]
+        if self.filtros["unidade"]:
+            condicoes["matriculas__turma__unidade_id"] = self.filtros["unidade"]
+        if self.filtros["serie"]:
+            condicoes["matriculas__turma__serie_id"] = self.filtros["serie"]
+        if self.filtros["turma"]:
+            condicoes["matriculas__turma_id"] = self.filtros["turma"]
+        if condicoes:
+            qs = qs.filter(matriculas__situacao=Matricula.Situacao.ATIVA, **condicoes)
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = self.q
+        ctx.update({f"{nome}_sel": valor or "" for nome, valor in self.filtros.items()})
+        ctx["filtros_ativos"] = bool(self.q) or any(self.filtros.values())
+        ctx["anos"] = AnoLetivo.objects.all()
+        ctx["unidades"] = Unidade.objects.filter(ativa=True)
+        ctx["series"] = Serie.objects.all()
+        ctx["turmas"] = Turma.objects.filter(ativa=True).select_related("unidade", "ano_letivo")
         return ctx
 
 

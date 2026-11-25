@@ -1,4 +1,5 @@
 import csv
+import re
 from datetime import date
 
 from django.contrib import messages
@@ -49,12 +50,17 @@ class TurmaListView(PerfilRequiredMixin, ListView):
         if unidade.isdigit():
             qs = qs.filter(unidade_id=int(unidade))
         q = self.request.GET.get("q", "").strip()
-        # Cada palavra digitada precisa aparecer no nome da turma ou da série,
-        # em qualquer ordem. "º" e "ª" são ignorados: "1 ano a" acha "1º ano A".
+        # Cada palavra digitada precisa aparecer no nome da turma ou da série, em qualquer ordem.
+        # "º" e "ª" são ignorados: "1 ano a" acha "1º ano A". Uma letra sozinha ("A", "B") é a
+        # identificação da turma, então só vale como palavra inteira (senão o "a" de "ano" acharia tudo).
         for palavra in q.replace("º", "").replace("ª", "").split():
-            qs = qs.filter(
-                Q(nome__icontains=palavra) | Q(serie__nome__icontains=palavra)
-            )
+            if len(palavra) == 1:
+                inteira = r"(^|\s)%s(\s|$)" % re.escape(palavra)
+                qs = qs.filter(Q(nome__iregex=inteira) | Q(serie__nome__iregex=inteira))
+            else:
+                qs = qs.filter(
+                    Q(nome__icontains=palavra) | Q(serie__nome__icontains=palavra)
+                )
         return qs
 
     def get_context_data(self, **kwargs):
