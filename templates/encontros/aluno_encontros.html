@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block titulo %}{{ aluno.nome }} · Encontros{% endblock %}
+
+{% block conteudo %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small mb-2">
+    <li class="breadcrumb-item"><a href="{% url 'encontros:lista' %}" class="text-decoration-none">Encontros</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ aluno.nome }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="mb-1">{{ aluno.nome }}</h1>
+    <div class="text-muted">
+      RA {{ aluno.ra|default:"—" }} · {{ aluno.serie|default:"série não informada" }} · {{ aluno.unidade }}
+    </div>
+  </div>
+  <a href="{% url 'encontros:criar' %}?aluno={{ aluno.pk }}" class="btn btn-primary">Novo encontro</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 mb-0">Histórico de encontros</h2>
+  {% if encontros %}
+  <div class="btn-group btn-group-sm" role="group" aria-label="Expandir ou recolher">
+    <button type="button" class="btn btn-outline-secondary" id="expandir-todos">Expandir todos</button>
+    <button type="button" class="btn btn-outline-secondary" id="recolher-todos">Recolher todos</button>
+  </div>
+  {% endif %}
+</div>
+
+<div class="accordion" id="encontros-acc">
+  {% for e in encontros %}
+  <div class="accordion-item mb-2 border rounded overflow-hidden">
+    <h3 class="accordion-header">
+      <button class="accordion-button collapsed" type="button"
+              data-bs-toggle="collapse" data-bs-target="#enc-{{ e.pk }}"
+              aria-expanded="false" aria-controls="enc-{{ e.pk }}">
+        <div class="w-100 pe-3">
+          <div class="d-flex justify-content-between flex-wrap gap-1">
+            <strong>{{ e.numero }}º encontro</strong>
+            <span>{{ e.data|date:"d/m/Y" }}</span>
+          </div>
+          <div class="small text-muted mt-1">
+            {% if e.presente %}Presente{% if e.get_duracao_display %} · {{ e.get_duracao_display }} min{% endif %}{% else %}Ausente{% endif %}
+            {% if e.temas %}· {{ e.temas|join:", " }}{% endif %}
+          </div>
+          <div class="mt-2">
+            {% if e.presente and e.combinados_anteriores %}
+              <span class="badge
+                {% if e.combinados_anteriores == 'realizou' %}text-bg-success
+                {% elif e.combinados_anteriores == 'parcial' %}text-bg-warning
+                {% elif e.combinados_anteriores == 'nao_realizou' %}text-bg-danger
+                {% else %}text-bg-secondary{% endif %}">
+                {{ e.get_combinados_anteriores_display }}
+              </span>
+            {% endif %}
+            {% if e.encaminhamento != "nao" %}
+              <span class="badge text-bg-dark">Encaminhado: {{ e.get_encaminhamento_display }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </button>
+    </h3>
+
+    <div id="enc-{{ e.pk }}" class="accordion-collapse collapse">
+      <div class="accordion-body bg-white">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Combinados do encontro anterior</dt>
+          <dd class="col-sm-8">{% if e.combinados_anteriores %}{{ e.get_combinados_anteriores_display }}{% else %}Não informado{% endif %}</dd>
+
+          <dt class="col-sm-4">Temas tratados</dt>
+          <dd class="col-sm-8">{% if e.temas %}{{ e.temas|join:", " }}{% else %}—{% endif %}</dd>
+
+          <dt class="col-sm-4">Combinados para o próximo encontro</dt>
+          <dd class="col-sm-8">{{ e.combinados_proximo|default:"—"|linebreaksbr }}</dd>
+
+          {% if e.habitos %}
+          <dt class="col-sm-4">Hábitos / rotina</dt>
+          <dd class="col-sm-8">{{ e.habitos }}</dd>
+          {% endif %}
+
+          {% if e.hobbies %}
+          <dt class="col-sm-4">Hobbies / interesses</dt>
+          <dd class="col-sm-8">{{ e.hobbies }}</dd>
+          {% endif %}
+
+          {% if e.pontos_fortes %}
+          <dt class="col-sm-4">Pontos fortes</dt>
+          <dd class="col-sm-8">{{ e.pontos_fortes }}</dd>
+          {% endif %}
+
+          {% if e.pontos_fracos %}
+          <dt class="col-sm-4">Pontos fracos</dt>
+          <dd class="col-sm-8">{{ e.pontos_fracos }}</dd>
+          {% endif %}
+
+          {% if e.carreira_desejada %}
+          <dt class="col-sm-4">Carreira desejada</dt>
+          <dd class="col-sm-8">{{ e.carreira_desejada }}</dd>
+          {% endif %}
+
+          {% if e.sabe_plurall is not None %}
+          <dt class="col-sm-4">Sabe utilizar o Plurall?</dt>
+          <dd class="col-sm-8">{% if e.sabe_plurall %}Sim{% else %}Não{% endif %}</dd>
+          {% endif %}
+
+          <dt class="col-sm-4">Encaminhamento</dt>
+          <dd class="col-sm-8">
+            {{ e.get_encaminhamento_display }}
+            {% if e.motivo_encaminhamento %}<span class="text-muted">· {{ e.motivo_encaminhamento }}</span>{% endif %}
+          </dd>
+
+          {% if e.observacoes %}
+          <dt class="col-sm-4">Observações</dt>
+          <dd class="col-sm-8">{{ e.observacoes|linebreaksbr }}</dd>
+          {% endif %}
+        </dl>
+
+        <hr>
+        <div class="small text-muted">
+          {% if e.registrado_por %}
+            Registrado por {{ e.registrado_por.get_full_name|default:e.registrado_por.username }}
+          {% else %}
+            Sem autor (migrado da planilha)
+          {% endif %}
+          em {{ e.criado_em|date:"d/m/Y H:i" }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted">Este aluno ainda não tem encontros registrados.</p>
+  {% endfor %}
+</div>
+
+<script>
+  // O Bootstrap é carregado no fim da página, então só usamos no clique.
+  function alternarTodos(abrir) {
+    document.querySelectorAll("#encontros-acc .collapse").forEach(function (el) {
+      var c = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+      abrir ? c.show() : c.hide();
+    });
+  }
+  document.getElementById("expandir-todos")?.addEventListener("click", function () { alternarTodos(true); });
+  document.getElementById("recolher-todos")?.addEventListener("click", function () { alternarTodos(false); });
+</script>
+{% endblock %}
